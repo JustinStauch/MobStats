@@ -1,0 +1,8 @@
+name: Mob Stats
+version: 1.0
+main: mobstats.MobStats
+authors: [Gamerguy14]
+commands:
+  zone:
+    description: Tells the player what zone they are in.
+    usage: /[command] <args>
