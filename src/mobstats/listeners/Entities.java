@@ -22,12 +22,26 @@ public class Entities extends EntityListener {
     public void onEntityDamage(EntityDamageEvent event) {
         if (event instanceof EntityDamageByEntityEvent) {
             EntityDamageByEntityEvent damage = (EntityDamageByEntityEvent) event;
-            if (damage.getDamager() instanceof Player) return;
+            if (damage.getDamager() instanceof Player) {
+                if (damage.getEntity() instanceof LivingEntity) {
+                    plugin.damage((LivingEntity)event.getEntity(), event.getDamage());
+                    damage.setDamage(0);
+                }
+            }
+            if (damage.getEntity() instanceof Player && damage.getDamager() instanceof LivingEntity) {
+                event.setDamage(plugin.damage(plugin.levels.get(damage.getDamager().getUniqueId())));
+                return;
+            }
             if (damage.getEntity() instanceof LivingEntity && damage.getDamager() instanceof LivingEntity) {
                 LivingEntity hit = (LivingEntity) damage.getEntity();
                 LivingEntity hitter = (LivingEntity) damage.getDamager();
                 UUID hity = hitter.getUniqueId();
-                event.setDamage(plugin.damage(plugin.levels.get(hity)));
+                if (hitter instanceof Player) {
+                    plugin.damage(hit, damage.getDamage());
+                    return;
+                }
+                plugin.damage(hit, plugin.damage(plugin.levels.get(hity)));
+                damage.setDamage(0);
             }
         }
     }
@@ -39,7 +53,7 @@ public class Entities extends EntityListener {
         if (!(event.getEntity() instanceof LivingEntity)) return;
         LivingEntity spawny = (LivingEntity) event.getEntity();
         if (plugin.levels.get(id) != null) plugin.levels.remove(id);
-        plugin.levels.put(id, plugin.level(plugin.spawns.get(event.getLocation().getWorld()).toVector().distance(event.getLocation().toVector())));
-        spawny.setHealth(plugin.health(plugin.levels.get(id)));
+        plugin.levels.put(id, plugin.level(plugin.closestOriginDistance(event.getLocation())));
+        plugin.setHealth(spawny);
     }
 }
