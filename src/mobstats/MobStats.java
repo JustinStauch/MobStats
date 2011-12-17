@@ -118,6 +118,7 @@ public class MobStats extends JavaPlugin {
                 out.write("respawnmessage: You have just respawned into a +level zone");
                 out.newLine();
                 out.write("portalmessage: You have just moved into a +level zone");
+                out.newLine();
                 for (int b = 0; b < worlds.size(); b++) {
                     out.write(worlds.get(b).getName() + ": spawn");
                     out.newLine();
