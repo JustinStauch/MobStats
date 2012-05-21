@@ -1,5 +1,5 @@
-name: Mob Stats
-version: 3.0.1
+name: MobStats
+version: 4.0
 main: mobstats.MobStats
 authors: [Gamerguy14]
 commands:

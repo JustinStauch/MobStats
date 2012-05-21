@@ -7,7 +7,16 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+/**
+ * Handles the plugin's command.
+ * 
+ * @author Justin Stauch
+ * @since May 20, 2012
+ * 
+ * copyright 2012© Justin Stauch, All Rights Reserved
+ */
 public class Commands implements CommandExecutor {
+    
     MobStats plugin;
     
     public Commands(MobStats plugin) {
@@ -15,14 +24,10 @@ public class Commands implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmnd, String commander, String[] args) {
+    public boolean onCommand(CommandSender sender, Command command, String commander, String[] args) {
         if (commander.equalsIgnoreCase("zone")) {
-            if (sender instanceof Player) {
-                Player player = (Player) sender;
-                int level = plugin.level(plugin.closestOriginDistance(player.getLocation()));
-                player.sendMessage("You are in a level " + level + " zone");
-                return true;
-            }
+            if (!(sender instanceof Player)) return true;
+            sender.sendMessage("Your current zone is " + plugin.level(plugin.closestOriginDistance(((Player) sender).getLocation())));
         }
         return true;
     }

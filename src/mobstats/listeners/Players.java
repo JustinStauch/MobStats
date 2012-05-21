@@ -2,59 +2,89 @@ package mobstats.listeners;
 
 import mobstats.MobStats;
 
-import org.bukkit.Location;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerListener;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
-public class Players extends PlayerListener {
+/**
+ * Handles all Player events which is the moving between zones.
+ * 
+ * @author Justin Stauch
+ * @since May 20, 2011
+ * 
+ * copyright 2012© Justin Stauch, All Rights Reserved
+ */
+public class Players implements Listener{
     
     MobStats plugin;
     
-    public Players(MobStats plugin) {
+    public Players (MobStats plugin) {
         this.plugin = plugin;
     }
     
-    @Override
+    /**
+     * Handles events for when a Player moves by sending a message if it is supposed to.
+     * 
+     * @param event The PlayerMoveEvent that was thrown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (!plugin.sendMessage) return;
-        Location To = event.getTo();
-        Location From = event.getFrom();
-        int toL = plugin.level(plugin.closestOriginDistance(To));
-        int fromL = plugin.level(plugin.closestOriginDistance(From));
-        if (fromL == toL) return;
-        event.getPlayer().sendMessage(plugin.message.replace("+level", Integer.toString(toL)));
-        
+        if (event.isCancelled()) return;
+        if (!plugin.sendMessage()) return;
+        int startLevel = plugin.level(plugin.closestOriginDistance(event.getFrom()));
+        int endLevel = plugin.level(plugin.closestOriginDistance(event.getTo()));
+        if (endLevel == startLevel) return;
+        event.getPlayer().sendMessage(plugin.getMessage().replace("+level", String.valueOf(endLevel)));
     }
     
-    @Override
+    /**
+     * Handles when a Player moves by sending a message if it is supposed to.
+     * 
+     * @param event The PlayerJoinEvent that was thrown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
-        if (!plugin.sendJoinMessage) return;
-        int level = plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation()));
-        event.getPlayer().sendMessage(plugin.joinMessage.replace("+level", Integer.toString(level)));
+        if (!plugin.sendJoinMessage()) return;
+        event.getPlayer().sendMessage(plugin.getJoinMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
     
-    @Override
-    public void onPlayerTeleport(PlayerTeleportEvent event) {
-        if (!plugin.sendTpMessage) return;
-        int level = plugin.level(plugin.closestOriginDistance(event.getTo()));
-        event.getPlayer().sendMessage(plugin.tpMessage.replace("+level", Integer.toString(level)));
+    /**
+     * Handles when a Player moves through a portal by sending a message if it is supposed to.
+     * 
+     * @param event The PlayerPortalEvent that was thrown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerPortalEvent(PlayerPortalEvent event) {
+        if (event.isCancelled()) return;
+        if (!plugin.sendPortalMessage()) return;
+        event.getPlayer().sendMessage(plugin.getPortalMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
     
-    @Override
+    /**
+     * Handles when a Player respawns by sending a message if it is supposed to.
+     * 
+     * @param event The PlayerRespawnEvent that was thrown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
-        if (!plugin.sendRespawnMessage) return;
-        int level = plugin.level(plugin.closestOriginDistance(event.getRespawnLocation()));
-        event.getPlayer().sendMessage(plugin.respawnMessage.replace("+level", Integer.toString(level)));
+        if (!plugin.sendRespawnMessage()) return;
+        event.getPlayer().sendMessage(plugin.getRespawnMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
     
-    @Override
-    public void onPlayerPortal(PlayerPortalEvent event) {
-        if (!plugin.sendPortalMessage) return;
-        int level = plugin.level(plugin.closestOriginDistance(event.getTo()));
-        event.getPlayer().sendMessage(plugin.portalMessage.replace("+level", Integer.toString(level)));
+    /**
+     * Handles when a Player teleports by sending a message if it is supposed to.
+     * 
+     * @param event THe PlayerTeleportEvent that was thrown.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        if (event.isCancelled()) return;
+        if (!plugin.sendTpMessage()) return;
+        event.getPlayer().sendMessage(plugin.getTpMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
 }

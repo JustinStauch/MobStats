@@ -1,262 +1,431 @@
 package mobstats;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Map;
 import java.util.UUID;
 
 import mobstats.listeners.Commands;
 import mobstats.listeners.Entities;
 import mobstats.listeners.Players;
-
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.event.Event.Priority;
-import org.bukkit.event.Event.Type;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * This is the main class of the plugin.
+ * 
+ * This class handles the enabling and disabling of the plugin, reads files, and has various methods to get important information for the rest of the plugin.
+ * 
+ * @author Justin Stauch (gamerguy14)
+ * @since February 14, 2012
+ * @see org.bukkit.plugin.java.JavaPlugin
+ */
 public class MobStats extends JavaPlugin {
     private PluginDescriptionFile info;
+    private FileConfiguration config;
+    private Map<World, ArrayList<Location>> origins;
+    private String message, joinMessage, portalMessage, respawnMessage, tpMessage;
+    private boolean sendMessage, sendJoinMessage, sendPortalMessage, sendRespawnMessage, sendTpMessage;
+    private StatSolver zones, damage, health, xp;
+    private ArrayList<EntityType> affectedMobs;
+    private boolean useAffectedMobs;
+    private HashMap<UUID, Integer> levels;
     private PluginManager manager;
-    private File directory, config;
-    private HashMap<UUID, Integer> health = new HashMap<UUID, Integer>();
-    public HashMap<World, ArrayList<Location>> origin = new HashMap<World, ArrayList<Location>>();
-    public HashMap<UUID, Integer> levels = new HashMap<UUID, Integer>();
-    public int size = 16;
-    public String message;
-    public String tpMessage;
-    public String joinMessage;
-    public String respawnMessage;
-    public String portalMessage;
-    public boolean sendMessage;
-    public boolean sendTpMessage;
-    public boolean sendJoinMessage;
-    public boolean sendRespawnMessage;
-    public boolean sendPortalMessage;
     
+    /**
+     * This method is called when the plugin disables.
+     */
     @Override
     public void onDisable() {
-        info = getDescription();
         
-        System.out.println("[" + info.getName() + "] disabled");
     }
     
+    /**
+     * This method is called when the plugin is enabled and it serves as the main method of the plugin. It goes through the process of creating files, reading files, and setting variables.
+     */
     @Override
     public void onEnable() {
         info = getDescription();
+        origins = new HashMap<World, ArrayList<Location>>();
         manager = getServer().getPluginManager();
-        directory = getDataFolder();
-        message = "You are now in a level +level zone";
-        tpMessage = "You have just teleported into a +level zone";
-        joinMessage = "You have just joined into a +level zone";
-        respawnMessage = "You have just respawned into a +level zone";
-        portalMessage = "You have just moved into a +level zone";
         
-        manager.registerEvent(Type.ENTITY_DAMAGE, new Entities(this), Priority.Normal, this);
-        manager.registerEvent(Type.CREATURE_SPAWN, new Entities(this), Priority.Normal, this);
+        getConfig().options().copyDefaults(true);
+        saveConfig();
+        config = getConfig();
         
-        manager.registerEvent(Type.PLAYER_MOVE, new Players(this), Priority.Normal, this);
-        manager.registerEvent(Type.PLAYER_JOIN, new Players(this), Priority.Normal, this);
-        manager.registerEvent(Type.PLAYER_TELEPORT, new Players(this), Priority.Normal, this);
-        manager.registerEvent(Type.PLAYER_RESPAWN, new Players(this), Priority.Normal, this);
-        manager.registerEvent(Type.PLAYER_PORTAL, new Players(this), Priority.Normal, this);
+        getMessages();
+        setupOrigins();
+        zones = getEquation("Equations.Zone");
+        damage = getEquation("Equations.Damage");
+        health = getEquation("Equations.Health");
+        xp = getEquation("Equations.XP");
+        saveConfig();
+        
+        manager.registerEvents(new Entities(this), this);
+        manager.registerEvents(new Players(this), this);
         
         getCommand("zone").setExecutor(new Commands(this));
-         
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
         
-        config = new File (directory, "config.yml");
-        
-        if (!config.exists()) {
-            BufferedWriter out = null;
-            List<World> worlds = getServer().getWorlds();
-            try {
-                out = new BufferedWriter(new FileWriter(config));
-                out.write("#Where it says 'zone:', type the size of the zone that you want.");
-                out.newLine();
-                out.write("#This number is the distance from the spawn that changes the levels.");
-                out.newLine();
-                out.write("#eg: 'zone: 16' means that when a player moves away from the spawn, the level of the zone increases every 16 blocks (1 chunk).");
-                out.newLine();
-                out.write("#For all the 'message:' areas write the appropiate message.");
-                out.newLine();
-                out.write("#If you type +level, it will be replaced with the level zone that the player just walked into.");
-                out.newLine();
-                out.write("#If you type 'false' or type nothing next to a message area, it will turn off that message.");
-                out.newLine();
-                out.write("#Type the name of the world then a location, or the word 'spawn' to set it as an origin.");
-                out.newLine();
-                out.write("#Write locations in the form of x,y,z");
-                out.newLine();
-                out.write("#The zone level will be determined by the closest origin.");
-                out.newLine();
-                out.write("#You can put more than one origin");
-                out.newLine();
-                out.write("#Lines that start with '#' or that are empty are ignored.");
-                out.newLine();
-                out.newLine();
-                out.write("zone: 16");
-                out.newLine();
-                out.write("message: You have just entered a +level zone");
-                out.newLine();
-                out.write("tpmessage: You have just teleported into a +level zone");
-                out.newLine();
-                out.write("joinmessage: You have just joined into a +level zone");
-                out.newLine();
-                out.write("respawnmessage: You have just respawned into a +level zone");
-                out.newLine();
-                out.write("portalmessage: You have just moved into a +level zone");
-                out.newLine();
-                for (int b = 0; b < worlds.size(); b++) {
-                    out.write(worlds.get(b).getName() + ": spawn");
-                    out.newLine();
-                }
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } finally {
-                try {
-                    out.close();
-                } catch (IOException ex){
-                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-                }
+        levels = new HashMap<UUID, Integer>();
+        List<World> worlds = getServer().getWorlds();
+        for (World world : worlds) {
+            List<LivingEntity> entities = world.getLivingEntities();
+            for (LivingEntity entity : entities) {
+                levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
+                entity.setHealth(health(levels.get(entity.getUniqueId())));
             }
         }
-        
-        sendMessage = true;
-        sendTpMessage = true;
-        sendJoinMessage = true;
-        sendRespawnMessage = true;
-        sendPortalMessage = true;
-        Scanner scan = null;
-        try {
-            scan = new Scanner(config);
-        } catch (IOException ex) {
-            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+    }
+    
+    public boolean sendMessage() {
+        return sendMessage;
+    }
+    
+    public String getMessage() {
+        return message;
+    }
+    
+    public boolean sendJoinMessage() {
+        return sendJoinMessage;
+    }
+    
+    public String getJoinMessage() {
+        return joinMessage;
+    }
+    
+    public boolean sendPortalMessage() {
+        return sendPortalMessage;
+    }
+    
+    public String getPortalMessage() {
+        return portalMessage;
+    }
+    
+    public boolean sendRespawnMessage() {
+        return sendRespawnMessage;
+    }
+    
+    public String getRespawnMessage() {
+        return respawnMessage;
+    }
+    
+    public boolean sendTpMessage() {
+        return sendTpMessage;
+    }
+    
+    public String getTpMessage() {
+        return tpMessage;
+    }
+    
+    /**
+     * Sets the Entity's level based on its Location.
+     * 
+     * @param entity The Entity to have its level set.
+     */
+    public void setLevel(Entity entity) {
+        if (levels.containsKey(entity.getUniqueId())) levels.remove(entity.getUniqueId());
+        levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
+    }
+    
+    /**
+     * Gets if a mob's stats should be modified by the plugin.
+     * 
+     * @param type The type of the Entity that is being checked for if it is affected.
+     * @return Whether the entity is affected or not.
+     */
+    public boolean isAffected(EntityType type) {
+        if (!useAffectedMobs) return true;
+        return affectedMobs.contains(type);
+    }
+    
+    /**
+     * Returns the level of a mob at the given distance from the origin.
+     * 
+     * @param distance The distance of the mob from the closest origin.
+     * @return The mobs level.
+     */
+    public int level(double distance) {
+        return (int) zones.solve(distance);
+    }
+    
+    /**
+     * Gets the damage that a mob of the given level will deal.
+     * 
+     * @param level The mob's level.
+     * @return The damage that a mob of the given level will deal.
+     */
+    public int damage(int level) {
+        return (int) damage.solve(level);
+    }
+    
+    /**
+     * Gets the health that a mob of the given level will have.
+     * 
+     * @param level The mob's level.
+     * @return The health that a mob of the given level will have.
+     */
+    public int health(int level) {
+        return (int) health.solve(level);
+    }
+    
+    /**
+     * Gets the amount of xp that a mob of the given level will drop upon dying.
+     * 
+     * @param level The mob's level.
+     * @return The xp that a mob of the given level will drop upon dying.
+     */
+    public int xp(int level) {
+        return (int) xp.solve(level);
+    }
+    
+    /**
+     * Gets the level of the given Entity. Sets the Entity's level based on Location if none exists.
+     * 
+     * @param entity The Entity that the level is to be gotten for. Cannot be a Player.
+     * @return The level of the Entity.
+     */
+    public int getLevel(Entity entity) {
+        if (entity instanceof Player) return 0;
+        if (!levels.containsKey(entity.getUniqueId())) levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
+        return levels.get(entity.getUniqueId());
+    }
+    
+    /**
+     * Finds the distance to the closest origin from a given Location.
+     * 
+     * @param loco The Location of the mob.
+     * @return The distance to the closest origin.
+     */
+    public double closestOriginDistance(Location loco) {
+        ArrayList<Location> allLoc = origins.get(loco.getWorld());
+        double closest = loco.distance(allLoc.get(0));
+        for (Location x : allLoc) {
+            double temp = loco.distance(x);
+            if (temp < closest) closest = temp;
         }
-        while (scan.hasNextLine()) {
-            String line = scan.nextLine();
-            char[] lin = line.toCharArray();
-            if (!(lin.length > 0)) continue;
-            Character lane = lin[0];
-            if (lane.equals('#')) continue;
-            String[] parts = line.split(": ");
-            if (parts.length != 2) {
-                parts = line.split(":");
-                if (parts.length != 2) continue;
+        return closest;
+    }
+    
+    /**
+     * Reads the part of the config file that contains the messages.
+     * 
+     * @throws Exception If there is a problem in the config reading, the exception will be thrown to be caught in the onEnable method.
+     */
+    private void getMessages() {
+        if (!config.contains("Messages")) {
+            message = "";
+            tpMessage = "";
+            joinMessage = "";
+            respawnMessage = "";
+            portalMessage = "";
+            sendMessage = false;
+            sendTpMessage = false;
+            sendJoinMessage = false;
+            sendRespawnMessage = false;
+            sendPortalMessage = false;
+            return;
+        }
+        if (!config.contains("Messages.Message")) {
+            message = "";
+            sendMessage = false;
+        }
+        else if (config.isBoolean("Messages.Message")) {
+            if (!config.getBoolean("Messages.Message")) {
+                sendMessage = false;
             }
-            if (parts[0].equalsIgnoreCase("zone")) size = Integer.parseInt(parts[1]);
-            if (parts[0].equalsIgnoreCase("message")) message = parts[1];
-            if (parts[0].equalsIgnoreCase("tpmessage")) tpMessage = parts[1];
-            if (parts[0].equalsIgnoreCase("joinmessage")) joinMessage = parts[1];
-            if (parts[0].equalsIgnoreCase("respawnMessage")) respawnMessage = parts[1];
-            if (parts[0].equalsIgnoreCase("portalmessage")) portalMessage = parts[1];
             else {
-                if (getServer().getWorld(parts[0]) != null) {
-                    if (parts[1].equals("spawn")) {
-                        ArrayList<Location> start = new ArrayList<Location>();
-                        if (origin.get(getServer().getWorld(parts[1])) != null) {
-                            start = origin.get(getServer().getWorld(parts[1]));
-                        }
-                        start.add(getServer().getWorld(parts[0]).getSpawnLocation());
-                        origin.put(getServer().getWorld(parts[0]), start);
-                    }
-                    else {
-                        String[] coo = parts[1].split(",");
-                        if (coo.length != 3) continue;
-                        double x = Double.parseDouble(coo[0]);
-                        double y = Double.parseDouble(coo[1]);
-                        double z = Double.parseDouble(coo[2]);
-                        Location start = new Location(getServer().getWorld(parts[0]), x, y, z);
-                        if (origin.get(getServer().getWorld(parts[0])) == null) {
-                            ArrayList<Location> starts = new ArrayList<Location>();
-                            starts.add(start);
-                            origin.put(getServer().getWorld(parts[0]), starts);
-                        }
-                        else {
-                            ArrayList<Location> starts = origin.get(getServer().getWorld(parts[0]));
-                            origin.remove(getServer().getWorld(parts[0]));
-                            starts.add(start);
-                            origin.put(getServer().getWorld(parts[0]), starts);
-                        }
-                    }
-                }
+                message = "true";
+                sendMessage = true;
             }
         }
-        if (message == null || message.equalsIgnoreCase("false")) sendMessage = false;
-        if (tpMessage == null || tpMessage.equalsIgnoreCase("false")) sendTpMessage = false;
-        if (joinMessage == null || joinMessage.equalsIgnoreCase("false")) sendJoinMessage = false;
-        if (respawnMessage == null || joinMessage.equalsIgnoreCase("false")) sendRespawnMessage = false;
-        if (portalMessage == null || joinMessage.equalsIgnoreCase("false")) sendPortalMessage = false;
-        
+        else if (config.isString("Messages.Message")) {
+            if (config.getString("Messages.Message").equalsIgnoreCase("false")) {
+                sendMessage = false;
+            }
+            else {
+                message = config.getString("Messages.Message");
+                sendMessage = true;
+            }
+        }
+        if (!config.contains("Messages.TP Message")) {
+            tpMessage = "";
+            sendTpMessage = false;
+        }
+        else if (config.isBoolean("Messages.TP Message")) {
+            if (!config.getBoolean("Messages.TP Message")) sendTpMessage = false;
+            else {
+                tpMessage = "true";
+                sendTpMessage = true;
+            }
+        }
+        else if (config.isString("Messages.TP Message")) {
+            if (config.getString("Messages.TP Message").equalsIgnoreCase("false")) sendTpMessage = false;
+            else {
+                tpMessage = config.getString("Messages.TP Message");
+                sendTpMessage = true;
+            }
+        }
+        if (!config.contains("Messages.Join Message")) {
+            joinMessage = "";
+            sendJoinMessage = false;
+        }
+        else if (config.isBoolean("Messages.Join Message")) {
+            if (!config.getBoolean("Messages.Join Message")) sendJoinMessage = false;
+            else {
+                joinMessage = "true";
+                sendJoinMessage = true;
+            }
+        }
+        else if (config.isString("Messages.Join Message")) {
+            if (config.getString("Messages.Join Message").equalsIgnoreCase("false")) sendJoinMessage = false;
+            else {
+                joinMessage = config.getString("Messages.Join Message");
+                sendJoinMessage = true;
+            }
+        }
+        if (!config.contains("Messages.Respawn Message")) {
+            respawnMessage = "";
+            sendRespawnMessage = false;
+        }
+        else if (config.isBoolean("Messages.Respawn Message")) {
+            if (!config.getBoolean("Messages.Respawn Message")) sendRespawnMessage = false;
+            else {
+                respawnMessage = "true";
+                sendRespawnMessage = true;
+            }
+        }
+        else if (config.isString("Messages.Respawn Message")) {
+            if (config.getString("Messages.Respawn Message").equalsIgnoreCase("false")) sendRespawnMessage = false;
+            else {
+                respawnMessage = config.getString("Messages.Respawn Message");
+                sendRespawnMessage = true;
+            }
+        }
+        if (!config.contains("Messages.Portal Message")) {
+            portalMessage = "";
+            sendPortalMessage = false;
+        }
+        else if (config.isBoolean("Messages.Portal Message")) {
+            if (!config.getBoolean("Messages.Message")) sendPortalMessage = false;
+            else {
+                portalMessage = "true";
+                sendPortalMessage = true;
+            }
+        }
+        else if (config.isString("Messages.Portal Message")) {
+            if (config.getString("Messages.Portal Message").equalsIgnoreCase("false")) sendMessage = false;
+            else {
+                portalMessage = config.getString("Messages.Portal Message");
+                sendPortalMessage = true;
+            }
+        }
+    }
+    
+    /**
+     * Reads the config file for the origins of the levels.
+     */
+    private void setupOrigins() {
+        if (!config.contains("Origins")) {
+            List<World> worlds = getServer().getWorlds();
+            for (int x = 0; x < worlds.size(); x++) {
+                ArrayList<Location> temp = new ArrayList<Location>();
+                temp.add(worlds.get(x).getSpawnLocation());
+                origins.put(worlds.get(x), temp);
+            }
+            return;
+        }
         List<World> worlds = getServer().getWorlds();
         for (int x = 0; x < worlds.size(); x++) {
-            List<Entity> entities = worlds.get(x).getEntities();
-            for (int y = 0; y < entities.size(); y++) {
-                if ((!(entities.get(y) instanceof LivingEntity)) && (!(entities.get(y) instanceof org.bukkit.entity.Player))) continue;
-                LivingEntity found = (LivingEntity) entities.get(y);
-                int level = level(closestOriginDistance(found.getLocation()));
-                UUID id = found.getUniqueId();
-                levels.put(id, level);
-                health.put(id, health(level));
+            if (!config.contains("Origins." + worlds.get(x).getName())) {
+                ArrayList<Location> tempLoc;
+                if (origins.get(worlds.get(x)) != null) {
+                    tempLoc = origins.get(worlds.get(x));
+                    origins.remove(worlds.get(x));
+                }
+                else tempLoc = new ArrayList<Location>();
+                tempLoc.add(worlds.get(x).getSpawnLocation());
+                origins.put(worlds.get(x), tempLoc);
+                continue;
             }
+            else if (!config.isList(("Origins." + worlds.get(x).getName()))) {
+                System.out.println("[" + info.getName() + "] Improper format in config!! Path \"Origins." + worlds.get(x).getName() + "\" must be a list.");
+                ArrayList<Location> tempLoc;
+                if (origins.get(worlds.get(x)) != null) {
+                    tempLoc = origins.get(worlds.get(x));
+                    origins.remove(worlds.get(x));
+                }
+                else tempLoc = new ArrayList<Location>();
+                tempLoc.add(worlds.get(x).getSpawnLocation());
+                origins.put(worlds.get(x), tempLoc);
+                continue;
+            }
+            List<String> stringOrg = config.getStringList("Origins." + worlds.get(x).getName());
+            ArrayList<Location> orgLoc = new ArrayList<Location>();
+            for (String i : stringOrg) orgLoc.add(stringToLocation(worlds.get(x), i));
+            if (origins.get(worlds.get(x)) == null) origins.remove(worlds.get(x));
+            origins.put(worlds.get(x), orgLoc);
         }
-        System.out.println("[" + info.getName() + "] ENABLED");
     }
     
-    public int level(double distance) {
-        int level = (int) distance/size;
-        return level;
-    }
-    
-    public int damage(int level) {
-        int damage = (int) ((int) level * 0.25);
-        return damage;
-    }
-    
-    public int health(int level) {
-        int hearts = (int) ((int) level * 0.75);
-        if (hearts < 0) hearts = 1;
-        return hearts;
-    }
-    
-    public Double closestOriginDistance(Location loco) {
-        Double dis = null;
-        for (int a = 0; a < origin.get(loco.getWorld()).size(); a++) {
-            double dist = loco.distance(origin.get(loco.getWorld()).get(a));
-            if (dis == null) dis = dist;
-            if (dist < dis) dis = dist;
+    /**
+     * Creates an equation out of the information for a certain path in the config. So far only quadratic equations are supported.
+     * 
+     * @param path The path to look for values at in the config.
+     * @return The equation from the given path.
+     */
+    private StatSolver getEquation(String path) {
+        if (config.getString(path + ".Type").equalsIgnoreCase("quadratic")) {
+            double a, b, c;
+            a = config.getDouble(path + ".a");
+            b = config.getDouble(path + ".b");
+            c = config.getDouble(path + ".c");
+            return new Quadratic(a, b, c);
         }
-        return dis;
+        return null;
     }
     
-    public void setHealth(Entity entity) {
-        if (health.get(entity.getUniqueId()) != null) health.remove(entity.getUniqueId());
-            health.put(entity.getUniqueId(), health(level(closestOriginDistance(entity.getLocation()))));
+    /**
+     * Sets up the part of the config related to mobs that are affected by the plugin.
+     */
+    public void setupAffectedMobs() {
+        affectedMobs = new ArrayList<EntityType>();
+        if (!config.contains("Affected Mobs")) {
+            useAffectedMobs = false;
+            return;
+        }
+        if (!config.isList("Affected Mobs")) {
+            System.out.println("[" + info.getName() + "] \"Affectd Mobs\" path should be a list.");
+            useAffectedMobs = false;
+            return;
+        }
+        List<String> rawMobs = config.getStringList("Affected Mobs");
+        for (String x : rawMobs) affectedMobs.add(EntityType.fromName(x));
+        useAffectedMobs = true;
     }
     
-    public void damage(LivingEntity entity, int damage) {
-        if (health.get(entity.getUniqueId()) == null) reSetup(entity);
-        int heart = health.get(entity.getUniqueId());
-        heart = heart - damage;
-        health.remove(entity.getUniqueId());
-        health.put(entity.getUniqueId(), heart);
-        if (heart <= 0) entity.damage(entity.getHealth());
-    }
-    
-    public void reSetup(Entity entity) {
-        levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
-        health.put(entity.getUniqueId(), health(levels.get(entity.getUniqueId())));
+    /**
+     * Turns a String into a Location.
+     * 
+     * @param world the World the Location is in.
+     * @param location the String representing the Location.
+     * @return the Location represented by the String.
+     */
+    private Location stringToLocation(World world, String location) {
+        if (location.equalsIgnoreCase("spawn")) return world.getSpawnLocation();
+        String[] coords = location.split(",");
+        if (coords.length != 3) return world.getSpawnLocation();
+        int x = Integer.parseInt(coords[0]);
+        int y = Integer.parseInt(coords[1]);
+        int z = Integer.parseInt(coords[2]);
+        return new Location(world, x, y, z);
     }
 }

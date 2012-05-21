@@ -1,0 +1,73 @@
+# Messages holds the options for each type of message. Each type is based on a way to move from zone to zone.
+# Type the desired message for each type using "+level" to place the level in. Typing "false" or nothing to turn the message off.
+# Origins is used to configure Locations to centre levels around. Levels change based on the distance from the closest origin point.
+# Type the name of the world in Origins followed by a list of Locations by placing a hyphen before each Location.
+# Type the Location in the form of x,y,z or type spawn to make the point the spawn.
+# IMPORTANT: Replace world with the name of your world and put lists for other worlds the same way.
+# Equations is used to make equations for each modification in the plugin.
+# Quadratic is the ONLY supported type at the moment. It takes the form of ax^2 + bx + c. c is the value when x is 0. Make a 0 for a linear equation, make a and b 0 for a constant value.
+# Zone is the level of the area. It is found by subbing the distance from the closest origin in for x in the quadratic equation.
+# Health is the health that a mob will have at a certain level. The level is subbed in for x.
+# Damage is the damage that a mob will deal at a certain level. The level is subbed in for x.
+# XP is the amount of exp that a mob will drop when killed at a certain level. The level is subbed in for x.
+# Affected Mobs is all the mobs that will be affected by this plugin. Place a list of all the mobs that are to be affected.
+# A list is made by placing names on top of each other with a hyphen beside each one.
+# Erase the section to enable all mobs.
+# All possible mobs are listed by default to show what to type. Erasing the section that was there by default will have the same effet on the plugin as not.
+
+Messages:
+  Message: You have just entered a level +level zone.
+  Join Message: You have just joined into a level +level zone.
+  Portal Message: You have just entered a level +level zone.
+  Respawn Message: You have just respawned into a level +level zone.
+  TP Message: You have just teleported into a level +level zone.
+Origins:
+  world: 
+    - spawn
+Equations:
+  Zone:
+    Type: Quadratic
+    a: 0
+    b: 0.0625
+    c: 0
+  Health:
+    Type: Quadratic
+    a: 0
+    b: 0.25
+    c: 1
+  Damage:
+    Type: Quadratic
+    a: 0
+    b: 0.5
+    c: 0
+  XP:
+    Type: Quadratic
+    a: 0
+    b: 2
+    c: 0
+Affected Mobs:
+  - Creeper
+  - Skeleton
+  - Spider
+  - Giant
+  - Zombie
+  - Slime
+  - Ghast
+  - PigZombie
+  - Enderman
+  - CaveSpider
+  - Silverfish
+  - Blaze
+  - LavaSlime
+  - EnderDragon
+  - Pig
+  - Sheep
+  - Cow
+  - Chicken
+  - Squid
+  - Wolf
+  - MushroomCow
+  - SnowMan
+  - Ozelot
+  - VillagerGolem
+  - Villager
