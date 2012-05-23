@@ -46,6 +46,7 @@ public class Entities implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityDeathEvent(EntityDeathEvent event) {
         if (event.getEntity() instanceof Player) return;
+        plugin.dropItems(event);
         if (!plugin.isAffected(event.getEntity().getType())) return;
         event.setDroppedExp(plugin.xp(plugin.getLevel(event.getEntity())));
     }
@@ -59,5 +60,6 @@ public class Entities implements Listener {
     public void onCreatureSpawnEvent(CreatureSpawnEvent event) {
         if (event.getEntity() instanceof Player) return;
         plugin.setLevel(event.getEntity());
+        event.getEntity().setHealth(plugin.health(plugin.getLevel(event.getEntity())));
     }
 }

@@ -1,6 +1,9 @@
 package mobstats;
 
+import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +19,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -28,6 +33,8 @@ import org.bukkit.plugin.java.JavaPlugin;
  * @author Justin Stauch (gamerguy14)
  * @since February 14, 2012
  * @see org.bukkit.plugin.java.JavaPlugin
+ * 
+ * copyright 2012© Justin Stauch, All Rights Reserved
  */
 public class MobStats extends JavaPlugin {
     private PluginDescriptionFile info;
@@ -40,6 +47,7 @@ public class MobStats extends JavaPlugin {
     private boolean useAffectedMobs;
     private HashMap<UUID, Integer> levels;
     private PluginManager manager;
+    private ArrayList<Drop> drops;
     
     /**
      * This method is called when the plugin disables.
@@ -58,9 +66,12 @@ public class MobStats extends JavaPlugin {
         origins = new HashMap<World, ArrayList<Location>>();
         manager = getServer().getPluginManager();
         
-        getConfig().options().copyDefaults(true);
-        saveConfig();
+        File configFile = new File(getDataFolder(), "config.yml");
+        if (!configFile.exists()) {
+            saveDefaultConfig();
+        }
         config = getConfig();
+        saveConfig();
         
         getMessages();
         setupOrigins();
@@ -68,7 +79,8 @@ public class MobStats extends JavaPlugin {
         damage = getEquation("Equations.Damage");
         health = getEquation("Equations.Health");
         xp = getEquation("Equations.XP");
-        saveConfig();
+        setupDrops();
+        setupAffectedMobs();
         
         manager.registerEvents(new Entities(this), this);
         manager.registerEvents(new Players(this), this);
@@ -197,6 +209,15 @@ public class MobStats extends JavaPlugin {
         if (entity instanceof Player) return 0;
         if (!levels.containsKey(entity.getUniqueId())) levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
         return levels.get(entity.getUniqueId());
+    }
+    
+    /**
+     * Gets each Drop to check for if it should drop and then drops if it is supposed to.
+     * 
+     * @param event The EntityDeathEvent that was thrown and holds information for the Drops.
+     */
+    public void dropItems(EntityDeathEvent event) {
+        for (Drop x : drops) x.drop(event);
     }
     
     /**
@@ -340,6 +361,9 @@ public class MobStats extends JavaPlugin {
                 ArrayList<Location> temp = new ArrayList<Location>();
                 temp.add(worlds.get(x).getSpawnLocation());
                 origins.put(worlds.get(x), temp);
+                ArrayList<String> tempS = new ArrayList<String>();
+                tempS.add("spawn");
+                config.addDefault("Origins." + worlds.get(x).getName(), tempS);
             }
             return;
         }
@@ -354,6 +378,9 @@ public class MobStats extends JavaPlugin {
                 else tempLoc = new ArrayList<Location>();
                 tempLoc.add(worlds.get(x).getSpawnLocation());
                 origins.put(worlds.get(x), tempLoc);
+                ArrayList<String> tempS = new ArrayList<String>();
+                tempS.add("spawn");
+                config.addDefault("Origins." + worlds.get(x).getName(), tempS);
                 continue;
             }
             else if (!config.isList(("Origins." + worlds.get(x).getName()))) {
@@ -366,6 +393,9 @@ public class MobStats extends JavaPlugin {
                 else tempLoc = new ArrayList<Location>();
                 tempLoc.add(worlds.get(x).getSpawnLocation());
                 origins.put(worlds.get(x), tempLoc);
+                ArrayList<String> tempS = new ArrayList<String>();
+                tempS.add("spawn");
+                config.addDefault("Origins." + worlds.get(x).getName(), tempS);
                 continue;
             }
             List<String> stringOrg = config.getStringList("Origins." + worlds.get(x).getName());
@@ -373,6 +403,7 @@ public class MobStats extends JavaPlugin {
             for (String i : stringOrg) orgLoc.add(stringToLocation(worlds.get(x), i));
             if (origins.get(worlds.get(x)) == null) origins.remove(worlds.get(x));
             origins.put(worlds.get(x), orgLoc);
+            config.addDefault("Origins." + worlds.get(x).getName(), stringOrg);
         }
     }
     
@@ -396,7 +427,7 @@ public class MobStats extends JavaPlugin {
     /**
      * Sets up the part of the config related to mobs that are affected by the plugin.
      */
-    public void setupAffectedMobs() {
+    private void setupAffectedMobs() {
         affectedMobs = new ArrayList<EntityType>();
         if (!config.contains("Affected Mobs")) {
             useAffectedMobs = false;
@@ -410,6 +441,72 @@ public class MobStats extends JavaPlugin {
         List<String> rawMobs = config.getStringList("Affected Mobs");
         for (String x : rawMobs) affectedMobs.add(EntityType.fromName(x));
         useAffectedMobs = true;
+    }
+    
+    /**
+     * Sets up the part of the config related to custom Drops
+     */
+    private void setupDrops() {
+        drops = new ArrayList<Drop>();
+        if (!config.contains("Drops")) return;
+        List<String> dropper = config.getStringList("Drops");
+        for (String x : dropper) {
+            if (!config.contains(x)) {
+                System.out.print("[" + info.getName() + "] Config does not conatain " + x);
+                continue;
+            }
+            List<String> mobs;
+            ArrayList<EntityType> usedMobs = new ArrayList<EntityType>();
+            if (config.contains(x + ".Mobs")) {
+                mobs = config.getStringList(x + ".Mobs");
+                for (String y : mobs) usedMobs.add(EntityType.fromName(y));
+                if (usedMobs.isEmpty()) usedMobs = getListOfAllTypes();
+            }
+            else usedMobs = getListOfAllTypes();
+            int startZone;
+            if (!config.contains(x + ".Start Zone")) startZone = 0;
+            else startZone = config.getInt(x + ".Start Zone");
+            config.set(x + ".Start Zone", startZone);
+            int endZone;
+            if (!config.contains(x + ".End Zone")) endZone = -1;
+            else endZone = config.getInt(x + ".End Zone");
+            config.set(x + ".End Zone", endZone);
+            int numerator, denominator;
+            if (!config.contains(x + ".Odds")) {
+                numerator = 1;
+                denominator = 1;
+                config.set(x + ".Odds", 1);
+            }
+            else {
+                String odds = config.getString(x + ".Odds");
+                String[] odder = odds.split("/");
+                if (odder.length == 1) {
+                    numerator = 1;
+                    denominator = 1;
+                }
+                else {
+                    numerator = Integer.parseInt(odder[0]);
+                    denominator = Integer.parseInt(odder[1]);
+                }
+                config.set(x + ".Odds", odds);
+            }
+            if (!config.contains(x + ".Items")) {
+                System.out.println("[" + info.getName() + "] " + x + " needs items");
+                continue;
+            }
+            List<String> items = config.getStringList(x + ".Items");
+            ArrayList<ItemStack> allItems = new ArrayList<ItemStack>();
+            config.set(x + ".Items", items);
+            for (String item : items) {
+                String[] parts = item.split(",");
+                int id = Integer.parseInt(parts[0]);
+                int amt;
+                if (parts.length == 1) amt = 1;
+                else amt = Integer.parseInt(parts[1]);
+                allItems.add(new ItemStack(id, amt));
+            }
+            drops.add(new Drop(allItems, startZone, endZone, numerator, denominator, usedMobs, this));
+        }
     }
     
     /**
@@ -427,5 +524,12 @@ public class MobStats extends JavaPlugin {
         int y = Integer.parseInt(coords[1]);
         int z = Integer.parseInt(coords[2]);
         return new Location(world, x, y, z);
+    }
+    
+    private ArrayList<EntityType> getListOfAllTypes() {
+        ArrayList<EntityType> entities = new ArrayList<EntityType>();
+        EntityType[] entity = EntityType.values();
+        entities.addAll(Arrays.asList(entity));
+        return entities;
     }
 }

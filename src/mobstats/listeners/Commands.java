@@ -16,7 +16,7 @@ import org.bukkit.entity.Player;
  * copyright 2012© Justin Stauch, All Rights Reserved
  */
 public class Commands implements CommandExecutor {
-    
+
     MobStats plugin;
     
     public Commands(MobStats plugin) {
