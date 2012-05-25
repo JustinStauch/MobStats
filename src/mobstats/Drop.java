@@ -53,8 +53,6 @@ public class Drop {
         int level = plugin.getLevel(event.getEntity());
         if (level >= startZone && (level <= endZone || endZone == -1)) {
             if (!mobs.isEmpty() && !mobs.contains(event.getEntityType())) {
-                System.out.println("not on list");
-                if (mobs.isEmpty()) System.out.println("it is empty");
                 return;
             }
             Random random = new Random();

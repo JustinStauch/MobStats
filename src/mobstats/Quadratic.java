@@ -18,6 +18,7 @@ package mobstats;
  */
 public class Quadratic implements StatSolver {
     private double a, b, c;
+    private boolean aDef, bDef, cDef
     
     /**
      * Creates a knew Quadratic formula with the given values.
@@ -26,10 +27,13 @@ public class Quadratic implements StatSolver {
      * @param b The b value of the equation.
      * @param c The c value of the equation.
      */
-    public Quadratic(double a, double b, double c) {
+    public Quadratic(double a, double b, double c, boolean aDef, boolean bDef, boolean cDef) {
         this.a = a;
         this.b = b;
         this.c = c;
+        this.aDef = aDef;
+        this.bDef = bDef;
+        this.cDef = cDef;
     }
     
     /**
@@ -79,8 +83,9 @@ public class Quadratic implements StatSolver {
      * @return The solution to the equation with the given value of x.
      */
     @Override
-    public double solve(double x) {
-        return (a * (x*x)) + (b*x) + c;
+    public double solve(double x, double def) {
+        double aVal, bVal, cVal;
+        if (aDef) aVal = a*def*()
     }
     
 }

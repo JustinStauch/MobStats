@@ -12,6 +12,11 @@ import java.util.UUID;
 import mobstats.listeners.Commands;
 import mobstats.listeners.Entities;
 import mobstats.listeners.Players;
+
+import net.milkbowl.vault.economy.Economy;
+
+import net.milkbowl.vault.economy.EconomyResponse;
+import org.bukkit.EntityEffect;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -23,6 +28,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -42,12 +48,15 @@ public class MobStats extends JavaPlugin {
     private Map<World, ArrayList<Location>> origins;
     private String message, joinMessage, portalMessage, respawnMessage, tpMessage;
     private boolean sendMessage, sendJoinMessage, sendPortalMessage, sendRespawnMessage, sendTpMessage;
-    private StatSolver zones, damage, health, xp;
+    private StatSolver zones, damage, health, xp, cash;
     private ArrayList<EntityType> affectedMobs;
     private boolean useAffectedMobs;
-    private HashMap<UUID, Integer> levels;
+    private HashMap<UUID, Integer> levels, healthOfMobs;
     private PluginManager manager;
     private ArrayList<Drop> drops;
+    private boolean useMoney;
+    
+    public static Economy economy = null;
     
     /**
      * This method is called when the plugin disables.
@@ -65,16 +74,17 @@ public class MobStats extends JavaPlugin {
         info = getDescription();
         origins = new HashMap<World, ArrayList<Location>>();
         manager = getServer().getPluginManager();
+        healthOfMobs = new HashMap<UUID, Integer>();
         
         File configFile = new File(getDataFolder(), "config.yml");
         if (!configFile.exists()) {
             saveDefaultConfig();
         }
         config = getConfig();
-        saveConfig();
         
         getMessages();
         setupOrigins();
+        setupCash();
         zones = getEquation("Equations.Zone");
         damage = getEquation("Equations.Damage");
         health = getEquation("Equations.Health");
@@ -93,7 +103,8 @@ public class MobStats extends JavaPlugin {
             List<LivingEntity> entities = world.getLivingEntities();
             for (LivingEntity entity : entities) {
                 levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
-                entity.setHealth(health(levels.get(entity.getUniqueId())));
+                entity.setHealth(entity.getMaxHealth());
+                healthOfMobs.put(entity.getUniqueId(), health(getLevel(entity)));
             }
         }
     }
@@ -136,6 +147,39 @@ public class MobStats extends JavaPlugin {
     
     public String getTpMessage() {
         return tpMessage;
+    }
+    
+    /**
+     * Sets the health of the given entity to the given amount.
+     * 
+     * @param entity The Entity to set the health for.
+     * @param amount The amount to set the entity's health to.
+     */
+    public void setHealth(Entity entity, int amount) {
+        UUID id = entity.getUniqueId();
+        if (healthOfMobs.get(id) != null) healthOfMobs.remove(id);
+        healthOfMobs.put(id, amount);
+    }
+    
+    /**
+     * Subtracts the given amount of health from the given entity.
+     * 
+     * @param entity The entity to damage.
+     * @param damage The damage to take off of the entity's health.
+     */
+    public void subtractHealth(LivingEntity entity, int damage, Entity damager) {
+        UUID id = entity.getUniqueId();
+        int health;
+        if (healthOfMobs.get(id) != null) health = healthOfMobs.get(id);
+        else health = health(getLevel(entity));
+        setHealth(entity, health - damage);
+        if (healthOfMobs.get(id) <= 0) {
+            if (damager instanceof Player && useMoney) {
+                Player damagePer = (Player) damager;
+                EconomyResponse depositPlayer = economy.depositPlayer(damagePer.getName(), cash(getLevel(entity)));
+            }
+            entity.setHealth(0);
+        }
     }
     
     /**
@@ -197,6 +241,17 @@ public class MobStats extends JavaPlugin {
      */
     public int xp(int level) {
         return (int) xp.solve(level);
+    }
+    
+    /**
+     * Gets the amount of money that a mob at the given level will drop upon dying.
+     * 
+     * @param level
+     * @return 
+     */
+    public double cash(int level) {
+        if (!useMoney) return 0;
+        return cash.solve(level);
     }
     
     /**
@@ -507,6 +562,34 @@ public class MobStats extends JavaPlugin {
             }
             drops.add(new Drop(allItems, startZone, endZone, numerator, denominator, usedMobs, this));
         }
+    }
+    
+    /**
+     * Reads the config to setup the area for the money drops of the mobs.
+     */
+    private void setupCash() {
+        if (!setupEconomy()) {
+            System.out.println("[" + info.getName() + "] No economy found! Ignoring economy.");
+            useMoney = false;
+            return;
+        }
+        if (!config.contains("Equations.Money")) {
+            useMoney = false;
+            return;
+        }
+        useMoney = true;
+        cash = getEquation("Equations.Money");
+    }
+    
+    /**
+     * Checks to see if their proper economy plugins and if there are it sets it up.
+     * 
+     * @return If the setup succeeded or not.
+     */
+    private boolean setupEconomy() {
+        RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
+        if (economyProvider != null) economy = economyProvider.getProvider();
+        return (economy != null);
     }
     
     /**

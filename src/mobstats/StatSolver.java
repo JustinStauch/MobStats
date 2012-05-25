@@ -9,5 +9,5 @@ package mobstats;
  */
 public interface StatSolver {
     
-    public double solve(double x);
+    public double solve(double x, double def);
 }

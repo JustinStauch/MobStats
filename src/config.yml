@@ -10,6 +10,7 @@
 # Health is the health that a mob will have at a certain level. The level is subbed in for x.
 # Damage is the damage that a mob will deal at a certain level. The level is subbed in for x.
 # XP is the amount of exp that a mob will drop when killed at a certain level. The level is subbed in for x.
+# Money is the amount of money that the player who killed the mob will be rewarded upon killing the entity. The leel is subbed in for x.
 # Under Drops, type a list of drops that are wanted. Type any String in the list, the worlds are just to show where the drop options are.
 # For each word typed under Drops, make a section for it. In each section there should be a list of all the mobs for the drop, the start zone, the end zone, the odds, and a list of the items.
 # If there is no start zone included, it will start at level 0. If there is no end zone included, it will go on forever.
@@ -50,6 +51,11 @@ Equations:
     Type: Quadratic
     a: 0
     b: 2
+    c: 0
+  Money:
+    Type: Quadratic
+    a: 0.5
+    b: 50
     c: 0
 Drops:
   - Zombie

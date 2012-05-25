@@ -2,7 +2,9 @@ package mobstats.listeners;
 
 import mobstats.MobStats;
 
+import org.bukkit.EntityEffect;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -33,9 +35,19 @@ public class Entities implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player) return;
-        if (!plugin.isAffected(event.getDamager().getType())) return;
-        event.setDamage(plugin.damage(plugin.getLevel(event.getDamager())));
+        if (!(event.getDamager() instanceof Player)) {
+            if (!plugin.isAffected(event.getDamager().getType())) return;
+            event.setDamage(plugin.damage(plugin.getLevel(event.getDamager())));
+        }
+        if (!(event.getEntity() instanceof Player)) {
+            if (!plugin.isAffected(event.getEntity().getType())) return;
+            if (event.getEntity() instanceof LivingEntity) {
+                plugin.subtractHealth((LivingEntity) event.getEntity(), event.getDamage(), event.getDamager());
+                event.setDamage(0);
+                event.getEntity().playEffect(EntityEffect.HURT);
+                event.getEntity().setLastDamageCause(event);
+            }
+        }
     }
     
     /**
@@ -60,6 +72,7 @@ public class Entities implements Listener {
     public void onCreatureSpawnEvent(CreatureSpawnEvent event) {
         if (event.getEntity() instanceof Player) return;
         plugin.setLevel(event.getEntity());
-        event.getEntity().setHealth(plugin.health(plugin.getLevel(event.getEntity())));
+        event.getEntity().setHealth(event.getEntity().getMaxHealth());
+        plugin.setHealth(event.getEntity(), plugin.health(plugin.getLevel(event.getEntity())));
     }
 }
