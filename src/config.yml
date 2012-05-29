@@ -5,12 +5,22 @@
 # Type the Location in the form of x,y,z or type spawn to make the point the spawn.
 # IMPORTANT: Replace world with the name of your world and put lists for other worlds the same way.
 # Equations is used to make equations for each modification in the plugin.
-# Quadratic is the ONLY supported type at the moment. It takes the form of ax^2 + bx + c. c is the value when x is 0. Make a 0 for a linear equation, make a and b 0 for a constant value.
+# Type all the required variables for each equation. These are the ones listed in the sample equations in the type descriptions.
+# The possible types are:
+#   Quadratic: An equation in the form of ax^2 + bx + c. Set a to 0 to make the equation linear. Set a and b to 0 for a constant value.
+#   QWD: The same as a quadratic equation but including the charater 'd' at the end of the number to have it be multiplied by the default value in the situation.
+#   QMD: The same as a quadratic but the whole equation is multiplied by the default value.
+#   Exponential: This is an equation in the form of a(b^(c(x - d))) + f.
+#   EWD: The same as QWD but the equation used is Exponential. The format is the same.
+#   EMD: The same as QMD but the equation used is Exponential.
+# c is the value when x is 0 for quadratics and c + a is the value when x is 0 for exponential equations.
+# There is no e for exponential equations because e is a constant that represents the base for natural log.
 # Zone is the level of the area. It is found by subbing the distance from the closest origin in for x in the quadratic equation.
 # Health is the health that a mob will have at a certain level. The level is subbed in for x.
 # Damage is the damage that a mob will deal at a certain level. The level is subbed in for x.
 # XP is the amount of exp that a mob will drop when killed at a certain level. The level is subbed in for x.
 # Money is the amount of money that the player who killed the mob will be rewarded upon killing the entity. The leel is subbed in for x.
+# IMPORTANT: Don't set equations so that they will get to high because it will ruin the game. Too high damage will kill the Player but they would still walk around like a ghost, immortal and can't interact with surroundings.
 # Under Drops, type a list of drops that are wanted. Type any String in the list, the worlds are just to show where the drop options are.
 # For each word typed under Drops, make a section for it. In each section there should be a list of all the mobs for the drop, the start zone, the end zone, the odds, and a list of the items.
 # If there is no start zone included, it will start at level 0. If there is no end zone included, it will go on forever.

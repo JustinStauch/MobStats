@@ -1,5 +1,5 @@
 name: MobStats
-version: 4.2
+version: 5.0
 main: mobstats.MobStats
 authors: [Gamerguy14]
 commands:

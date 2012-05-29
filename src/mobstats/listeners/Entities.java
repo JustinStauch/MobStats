@@ -37,7 +37,8 @@ public class Entities implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player)) {
             if (!plugin.isAffected(event.getDamager().getType())) return;
-            event.setDamage(plugin.damage(plugin.getLevel(event.getDamager())));
+            int damage = event.getDamage();
+            event.setDamage(plugin.damage(plugin.getLevel(event.getDamager()), damage));
         }
         if (!(event.getEntity() instanceof Player)) {
             if (!plugin.isAffected(event.getEntity().getType())) return;
@@ -60,7 +61,8 @@ public class Entities implements Listener {
         if (event.getEntity() instanceof Player) return;
         plugin.dropItems(event);
         if (!plugin.isAffected(event.getEntity().getType())) return;
-        event.setDroppedExp(plugin.xp(plugin.getLevel(event.getEntity())));
+        int xp = event.getDroppedExp();
+        event.setDroppedExp(plugin.xp(plugin.getLevel(event.getEntity()), xp));
     }
     
     /**
@@ -73,6 +75,6 @@ public class Entities implements Listener {
         if (event.getEntity() instanceof Player) return;
         plugin.setLevel(event.getEntity());
         event.getEntity().setHealth(event.getEntity().getMaxHealth());
-        plugin.setHealth(event.getEntity(), plugin.health(plugin.getLevel(event.getEntity())));
+        plugin.setHealth(event.getEntity(), plugin.health(plugin.getLevel(event.getEntity()), event.getEntity().getMaxHealth()));
     }
 }

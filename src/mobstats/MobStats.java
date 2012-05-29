@@ -1,7 +1,6 @@
 package mobstats;
 
 import java.io.File;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -9,14 +8,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import mobstats.equations.StatSolver;
+import mobstats.equations.exponential.EMD;
+import mobstats.equations.exponential.EWD;
+import mobstats.equations.exponential.Exponential;
+import mobstats.equations.quadratic.QMD;
+import mobstats.equations.quadratic.QWD;
+import mobstats.equations.quadratic.Quadratic;
 import mobstats.listeners.Commands;
 import mobstats.listeners.Entities;
 import mobstats.listeners.Players;
 
 import net.milkbowl.vault.economy.Economy;
 
-import net.milkbowl.vault.economy.EconomyResponse;
-import org.bukkit.EntityEffect;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -102,9 +106,10 @@ public class MobStats extends JavaPlugin {
         for (World world : worlds) {
             List<LivingEntity> entities = world.getLivingEntities();
             for (LivingEntity entity : entities) {
+                if (!isAffected(entity.getType())) continue;
                 levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
+                healthOfMobs.put(entity.getUniqueId(), health(getLevel(entity), entity.getHealth()));
                 entity.setHealth(entity.getMaxHealth());
-                healthOfMobs.put(entity.getUniqueId(), health(getLevel(entity)));
             }
         }
     }
@@ -171,12 +176,12 @@ public class MobStats extends JavaPlugin {
         UUID id = entity.getUniqueId();
         int health;
         if (healthOfMobs.get(id) != null) health = healthOfMobs.get(id);
-        else health = health(getLevel(entity));
+        else health = health(getLevel(entity), entity.getMaxHealth());
         setHealth(entity, health - damage);
         if (healthOfMobs.get(id) <= 0) {
             if (damager instanceof Player && useMoney) {
                 Player damagePer = (Player) damager;
-                EconomyResponse depositPlayer = economy.depositPlayer(damagePer.getName(), cash(getLevel(entity)));
+                economy.depositPlayer(damagePer.getName(), cash(getLevel(entity)));
             }
             entity.setHealth(0);
         }
@@ -210,7 +215,7 @@ public class MobStats extends JavaPlugin {
      * @return The mobs level.
      */
     public int level(double distance) {
-        return (int) zones.solve(distance);
+        return Double.valueOf(Math.floor(zones.solve(distance, 0))).intValue();
     }
     
     /**
@@ -219,8 +224,8 @@ public class MobStats extends JavaPlugin {
      * @param level The mob's level.
      * @return The damage that a mob of the given level will deal.
      */
-    public int damage(int level) {
-        return (int) damage.solve(level);
+    public int damage(int level, double def) {
+        return Double.valueOf(Math.floor(damage.solve(level, def))).intValue();
     }
     
     /**
@@ -229,8 +234,8 @@ public class MobStats extends JavaPlugin {
      * @param level The mob's level.
      * @return The health that a mob of the given level will have.
      */
-    public int health(int level) {
-        return (int) health.solve(level);
+    public int health(int level, double def) {
+        return Double.valueOf(Math.floor(health.solve(level, def))).intValue();
     }
     
     /**
@@ -239,19 +244,19 @@ public class MobStats extends JavaPlugin {
      * @param level The mob's level.
      * @return The xp that a mob of the given level will drop upon dying.
      */
-    public int xp(int level) {
-        return (int) xp.solve(level);
+    public int xp(int level, double def) {
+        return Double.valueOf(Math.floor(xp.solve(level, def))).intValue();
     }
     
     /**
      * Gets the amount of money that a mob at the given level will drop upon dying.
      * 
      * @param level
-     * @return 
+     * @return The amount of money that should be rewarded.
      */
     public double cash(int level) {
         if (!useMoney) return 0;
-        return cash.solve(level);
+        return Double.valueOf(Math.floor(cash.solve(level, 0))).intValue();
     }
     
     /**
@@ -475,6 +480,100 @@ public class MobStats extends JavaPlugin {
             b = config.getDouble(path + ".b");
             c = config.getDouble(path + ".c");
             return new Quadratic(a, b, c);
+        }
+        if (config.getString(path + ".Type").equalsIgnoreCase("QWD")) {
+            double a, b, c;
+            boolean aDef, bDef, cDef;
+            String hold;
+            hold = config.getString(path + ".a");
+            if (hold.contains("d")) {
+                aDef = true;
+                hold.replaceAll("d", "");
+                System.out.println(hold);
+            }
+            else aDef = false;
+            a = Double.parseDouble(hold);
+            hold = config.getString(path + ".b");
+            if (hold.contains("d")) {
+                bDef = true;
+                hold.replaceAll("d", "");
+            }
+            else bDef = false;
+            b = Double.parseDouble(hold);
+            hold = config.getString(path + ".c");
+            if (hold.contains("d")) {
+                cDef = true;
+                hold.replaceAll("d", "");
+            }
+            else cDef = false;
+            c = Double.parseDouble(hold);
+            return new QWD(a, b, c, aDef, bDef, cDef);
+        }
+        if (config.getString(path + ".Type").equalsIgnoreCase("QMD")) {
+            double a, b, c;
+            a = config.getDouble(path + ".a");
+            b = config.getDouble(path + ".b");
+            c = config.getDouble(path + ".c");
+            return new QMD(a, b, c);
+        }
+        if (config.getString(path + ".Type").equalsIgnoreCase("exponential")) {
+            double a, b, c, d, f;
+            a = config.getDouble(path + ".a");
+            b = config.getDouble(path + ".b");
+            c = config.getDouble(path + ".c");
+            d = config.getDouble(path + ".d");
+            f = config.getDouble(path + ".f");
+            return new Exponential(a, b, c, d, f);
+        }
+        if (config.getString(path + ".Type").equalsIgnoreCase("EWD")) {
+            double a, b, c, d, f;
+            boolean aDef, bDef, cDef, dDef, fDef;
+            String hold;
+            hold = config.getString(path + ".a");
+            if (hold.contains("d")) {
+                aDef = true;
+                hold.replaceAll("d", "");
+            }
+            else aDef = false;
+            a = Double.parseDouble(hold);
+            hold = config.getString(path + ".b");
+            if (hold.contains("d")) {
+                bDef = true;
+                hold.replaceAll("d", "");
+            }
+            else bDef = false;
+            b = Double.parseDouble(hold);
+            hold = config.getString(path + ".c");
+            if (hold.contains("d")) {
+                cDef = true;
+                hold.replaceAll("d", "");
+            }
+            else cDef = false;
+            c = Double.parseDouble(hold);
+            hold = config.getString(path + ".d");
+            if (hold.contains("d")) {
+                dDef = true;
+                hold.replaceAll("d", "");
+            }
+            else dDef = false;
+            d = Double.parseDouble(hold);
+            hold = config.getString(path + ".f");
+            if (hold.contains("d")) {
+                fDef = true;
+                hold.replaceAll("d", "");
+            }
+            else fDef = false;
+            f = Double.parseDouble(hold);
+            return new EWD(a, b, c, d, f, aDef, bDef, cDef, dDef, fDef);
+        }
+        if (config.getString(path + ".Type").equalsIgnoreCase("EMD")) {
+            double a, b, c, d, f;
+            a = config.getDouble(path + ".a");
+            b = config.getDouble(path + ".b");
+            c = config.getDouble(path + ".c");
+            d = config.getDouble(path + ".d");
+            f = config.getDouble(path + ".f");
+            return new EMD(a, b, c, d, f);
         }
         return null;
     }
