@@ -1,6 +1,7 @@
 package mobstats.listeners;
 
 import mobstats.MobStats;
+import org.bukkit.ChatColor;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -28,6 +29,7 @@ public class Commands implements CommandExecutor {
         if (commander.equalsIgnoreCase("zone")) {
             if (!(sender instanceof Player)) return true;
             sender.sendMessage("Your current zone is " + plugin.level(plugin.closestOriginDistance(((Player) sender).getLocation())));
+            return true;
         }
         return true;
     }

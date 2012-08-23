@@ -27,6 +27,9 @@
 # For the odds, type a fraction for the odds. If the number is a whole number, the numerator is larger or equal to the denominator, or none are included, the drop will drop all the time.
 # If the list of mobs is not included, all mobs will follow this drop.
 # IMPORTANT: When removing a section from a drop, create a new drop instead of removing the section.
+# Delay is the delay between hits allowed on all affected mobs (see below). This is to avoid having mobs vanish when landing too consecutive hits too quickly. The number is in secdonds.
+# 1.5 is just a guess for the length that it is without the plugin. I will fix this if I find the right number.
+# The Level Cap is the maximum level to have mobs reach, any zone where based on the equation should be higher than the cap will be a the cap.
 # Affected Mobs is all the mobs that will be affected by this plugin. Place a list of all the mobs that are to be affected.
 # A list is made by placing names on top of each other with a hyphen beside each one.
 # Erase the section to enable all mobs.
@@ -77,6 +80,8 @@ Zombie:
   Odds: 2/100
   Items:
     - 367,1
+Delay: 1.5
+Level Cap: none
 Affected Mobs:
   - Creeper
   - Skeleton

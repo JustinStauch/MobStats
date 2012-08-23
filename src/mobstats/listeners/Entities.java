@@ -3,7 +3,8 @@ package mobstats.listeners;
 import mobstats.MobStats;
 
 import org.bukkit.EntityEffect;
-import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -35,18 +36,34 @@ public class Entities implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player)) {
-            if (!plugin.isAffected(event.getDamager().getType())) return;
+        Entity damager;
+        if (event.getDamager() instanceof Arrow) {
+            Arrow arrow = (Arrow) event.getDamager();
+            damager = arrow.getShooter();
+        }
+        else damager = event.getDamager();
+        if (!(damager instanceof Player)) {
+            if (!plugin.isAffected(damager.getType())) return;
             int damage = event.getDamage();
-            event.setDamage(plugin.damage(plugin.getLevel(event.getDamager()), damage));
+            event.setDamage(plugin.damage(plugin.getLevel(damager), damage));
         }
         if (!(event.getEntity() instanceof Player)) {
             if (!plugin.isAffected(event.getEntity().getType())) return;
+            if (plugin.isInvincible(event.getEntity())) {
+                return;
+            }
             if (event.getEntity() instanceof LivingEntity) {
-                plugin.subtractHealth((LivingEntity) event.getEntity(), event.getDamage(), event.getDamager());
-                event.setDamage(0);
-                event.getEntity().playEffect(EntityEffect.HURT);
+                if (plugin.isInvincible(event.getEntity())) {
+                    return;
+                }
+                plugin.gotHit(event.getEntity());
+                LivingEntity ent = (LivingEntity) event.getEntity();
+                boolean died = plugin.subtractHealth(ent, event.getDamage(), event.getDamager());
+                event.setDamage(-1);
                 event.getEntity().setLastDamageCause(event);
+                if ((ent.isDead() || ent.getHealth() == 0) && !died) {
+                    ent.setHealth(ent.getMaxHealth());
+                }
             }
         }
     }

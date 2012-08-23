@@ -1,11 +1,20 @@
 package mobstats;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import mobstats.equations.StatSolver;
@@ -21,9 +30,15 @@ import mobstats.listeners.Players;
 
 import net.milkbowl.vault.economy.Economy;
 
+import net.minecraft.server.DamageSource;
+import net.minecraft.server.EntityExperienceOrb;
+import net.minecraft.server.EntityLiving;
+
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.craftbukkit.entity.CraftHumanEntity;
+import org.bukkit.craftbukkit.entity.CraftLivingEntity;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -56,9 +71,12 @@ public class MobStats extends JavaPlugin {
     private ArrayList<EntityType> affectedMobs;
     private boolean useAffectedMobs;
     private HashMap<UUID, Integer> levels, healthOfMobs;
+    private HashMap<UUID, Boolean> invincible; 
     private PluginManager manager;
     private ArrayList<Drop> drops;
     private boolean useMoney;
+    private double delay;
+    private int levelCap;
     
     public static Economy economy = null;
     
@@ -67,7 +85,71 @@ public class MobStats extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        
+        cleanUpHashMaps();
+        File levelData = new File(getDataFolder(), "levels.data");
+        File healthData = new File(getDataFolder(), "health.data");
+        File invincibleData = new File(getDataFolder(), "invincible.data");
+        if (!getDataFolder().exists()) {
+            getDataFolder().mkdirs();
+        }
+        if (!levelData.exists()) {
+            try {
+                levelData.createNewFile();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
+        if (!healthData.exists()) {
+            try {
+                healthData.createNewFile();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
+        if (!invincibleData.exists()) {
+            try {
+                invincibleData.createNewFile();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
+        ObjectOutputStream out = null;
+        try {
+            out =  new ObjectOutputStream(new FileOutputStream(levelData));
+            out.writeObject(levels);
+        } catch (IOException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } finally {
+            try {
+                out.close();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
+        try {
+            out =  new ObjectOutputStream(new FileOutputStream(healthData));
+            out.writeObject(levels);
+        } catch (IOException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } finally {
+            try {
+                out.close();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
+        try {
+            out =  new ObjectOutputStream(new FileOutputStream(invincibleData));
+            out.writeObject(levels);
+        } catch (IOException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } finally {
+            try {
+                out.close();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            }
+        }
     }
     
     /**
@@ -78,7 +160,6 @@ public class MobStats extends JavaPlugin {
         info = getDescription();
         origins = new HashMap<World, ArrayList<Location>>();
         manager = getServer().getPluginManager();
-        healthOfMobs = new HashMap<UUID, Integer>();
         
         File configFile = new File(getDataFolder(), "config.yml");
         if (!configFile.exists()) {
@@ -86,6 +167,7 @@ public class MobStats extends JavaPlugin {
         }
         config = getConfig();
         
+        loadHashMaps();
         getMessages();
         setupOrigins();
         setupCash();
@@ -95,23 +177,20 @@ public class MobStats extends JavaPlugin {
         xp = getEquation("Equations.XP");
         setupDrops();
         setupAffectedMobs();
+        delay = config.getDouble("Delay");
+        if (!config.contains("Level Cap") || config.getString("Level Cap").equalsIgnoreCase("none") || config.getString("Level Cap").equalsIgnoreCase("n")) {
+            levelCap = Integer.MAX_VALUE;
+        }
+        else {
+            levelCap = config.getInt("Level Cap");
+        }
         
         manager.registerEvents(new Entities(this), this);
         manager.registerEvents(new Players(this), this);
         
         getCommand("zone").setExecutor(new Commands(this));
         
-        levels = new HashMap<UUID, Integer>();
-        List<World> worlds = getServer().getWorlds();
-        for (World world : worlds) {
-            List<LivingEntity> entities = world.getLivingEntities();
-            for (LivingEntity entity : entities) {
-                if (!isAffected(entity.getType())) continue;
-                levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
-                healthOfMobs.put(entity.getUniqueId(), health(getLevel(entity), entity.getHealth()));
-                entity.setHealth(entity.getMaxHealth());
-            }
-        }
+        fillHashMaps();
     }
     
     public boolean sendMessage() {
@@ -162,17 +241,18 @@ public class MobStats extends JavaPlugin {
      */
     public void setHealth(Entity entity, int amount) {
         UUID id = entity.getUniqueId();
-        if (healthOfMobs.get(id) != null) healthOfMobs.remove(id);
         healthOfMobs.put(id, amount);
+        invincible.put(id, false);
     }
     
     /**
-     * Subtracts the given amount of health from the given entity.
+     * Subtracts the given amount of health from the given entity and kills it if necessary then returns if it killed it or not.
      * 
      * @param entity The entity to damage.
      * @param damage The damage to take off of the entity's health.
+     * @return If the entity died from the subtraction of health.
      */
-    public void subtractHealth(LivingEntity entity, int damage, Entity damager) {
+    public boolean subtractHealth(LivingEntity entity, int damage, Entity damager) {
         UUID id = entity.getUniqueId();
         int health;
         if (healthOfMobs.get(id) != null) health = healthOfMobs.get(id);
@@ -183,8 +263,60 @@ public class MobStats extends JavaPlugin {
                 Player damagePer = (Player) damager;
                 economy.depositPlayer(damagePer.getName(), cash(getLevel(entity)));
             }
-            entity.setHealth(0);
+            if (entity instanceof CraftLivingEntity) {
+                CraftLivingEntity live = (CraftLivingEntity) entity;
+                EntityLiving li = live.getHandle();
+                if (damager instanceof CraftHumanEntity) {
+                    li.die(DamageSource.playerAttack(((CraftHumanEntity) damager).getHandle()));
+                }
+                else if (damager instanceof CraftLivingEntity) {
+                    li.die(DamageSource.mobAttack(((CraftLivingEntity) damager).getHandle()));
+                }
+                //CraftBukkit code taken from the class net.minecraft.server.EntityLiving in the protected method aI(). Since I was bypassing craftbukkit code I needed to implement some stuff that gets skipped like this which is exp dropping.
+                int i = li.expToDrop;
+                while (i > 0) {
+                    int j = EntityExperienceOrb.getOrbValue(i);
+                    i -= j;
+                    li.world.addEntity(new EntityExperienceOrb(li.world, li.locX, li.locY, li.locZ, j));
+                }
+                //End of craftbukkit code.
+            }
+            entity.remove();//Makes sure the entity is gone.
+            return true;
         }
+        return false;
+    }
+    
+    /**
+     * Checks for if the given Entity is invincible.
+     * 
+     * @param entity The entity to check for invincibility with.
+     * @return If the entity is invincible or not.
+     */
+    public boolean isInvincible(Entity entity) {
+        UUID id = entity.getUniqueId();
+        if (invincible.get(id) == null) {
+            invincible.put(id, false);
+        }
+        return invincible.get(entity.getUniqueId());
+    }
+    
+    /**
+     * Makes the given Entity invincibility and then sets up a Timer to remove the invincibility.
+     * 
+     * @param entity The Entity to make invincible.
+     */
+    public void gotHit(final Entity entity) {
+        invincible.put(entity.getUniqueId(), true);
+        Calendar cal = new GregorianCalendar();
+        Timer time = new Timer();
+        cal.add(Calendar.MILLISECOND, (int) delay * 1000);
+        time.schedule(new TimerTask() {
+            @Override 
+            public void run() {
+                invincible.put(entity.getUniqueId(), false);
+            }
+        }, cal.getTime());
     }
     
     /**
@@ -193,7 +325,6 @@ public class MobStats extends JavaPlugin {
      * @param entity The Entity to have its level set.
      */
     public void setLevel(Entity entity) {
-        if (levels.containsKey(entity.getUniqueId())) levels.remove(entity.getUniqueId());
         levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
     }
     
@@ -205,6 +336,7 @@ public class MobStats extends JavaPlugin {
      */
     public boolean isAffected(EntityType type) {
         if (!useAffectedMobs) return true;
+        if (type.equals(EntityType.PLAYER)) return false;
         return affectedMobs.contains(type);
     }
     
@@ -215,7 +347,8 @@ public class MobStats extends JavaPlugin {
      * @return The mobs level.
      */
     public int level(double distance) {
-        return Double.valueOf(Math.floor(zones.solve(distance, 0))).intValue();
+        int level = Double.valueOf(Math.floor(zones.solve(distance, 0))).intValue();
+        return level > levelCap ? levelCap : level;
     }
     
     /**
@@ -294,6 +427,108 @@ public class MobStats extends JavaPlugin {
             if (temp < closest) closest = temp;
         }
         return closest;
+    }
+    
+    /**
+     * Loads the HashMaps out of memory.
+     */
+    private void loadHashMaps() {
+        ObjectInputStream in = null;
+        File levelData = new File(getDataFolder(), "levels.data");
+        File healthData = new File(getDataFolder(), "health.data");
+        File invincibleData = new File(getDataFolder(), "invincible.data");
+        if (!levelData.exists()) {
+            levels = new HashMap<UUID, Integer>();
+        }
+        else {
+            try {
+                in = new ObjectInputStream(new FileInputStream(levelData));
+                levels = (HashMap<UUID, Integer>) in.readObject();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } catch (ClassNotFoundException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException ex) {
+                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+                }
+            }
+        }
+        if (!healthData.exists()) {
+            healthOfMobs = new HashMap<UUID, Integer>();
+        }
+        else {
+            try {
+                in = new ObjectInputStream(new FileInputStream(healthData));
+                healthOfMobs = (HashMap<UUID, Integer>) in.readObject();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } catch (ClassNotFoundException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException ex) {
+                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+                }
+            }
+        }
+        if (!invincibleData.exists()) {
+            invincible = new HashMap<UUID, Boolean>();
+        }
+        else {
+            try {
+                in = new ObjectInputStream(new FileInputStream(invincibleData));
+                invincible = (HashMap<UUID, Boolean>) in.readObject();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } catch (ClassNotFoundException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException ex) {
+                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+                }
+            }
+        }
+        if (levels == null) {
+            levels = new HashMap<UUID, Integer>();
+        }
+        if (healthOfMobs == null) {
+            healthOfMobs = new HashMap<UUID, Integer>();
+        }
+        if (invincible == null) {
+            invincible = new HashMap<UUID, Boolean>();
+        }
+    }
+    
+    /**
+     * Looks through all the entities, calculates there stats, and adds them to HashMaps to store the stats.
+     */
+    private void fillHashMaps() {
+        List<World> worlds = getServer().getWorlds();
+        for (World world : worlds) {
+            List<LivingEntity> entities = world.getLivingEntities();
+            for (LivingEntity entity : entities) {
+                if (!isAffected(entity.getType())) {
+                    continue;
+                }
+                UUID id = entity.getUniqueId();
+                if (!levels.containsKey(id)) {
+                    levels.put(id, level(closestOriginDistance(entity.getLocation())));
+                }
+                if (!healthOfMobs.containsKey(id)) {
+                    healthOfMobs.put(id, health(getLevel(entity), entity.getHealth()));
+                }
+                if(!invincible.containsKey(id)) {
+                    invincible.put(id, false);
+                }
+                entity.setHealth(entity.getMaxHealth());
+            }
+        }
     }
     
     /**
@@ -713,5 +948,62 @@ public class MobStats extends JavaPlugin {
         EntityType[] entity = EntityType.values();
         entities.addAll(Arrays.asList(entity));
         return entities;
+    }
+    
+    /**
+     * Removes all mobs that are stored in a HashMap but do not exist.
+     */
+    private void cleanUpHashMaps() {
+        for (UUID id : levels.keySet().toArray(new UUID[levels.keySet().size()])) {
+            boolean exists = false;
+            for (World world : getServer().getWorlds()) {
+                for (Entity ent : world.getEntities()) {
+                    if (ent.getUniqueId().equals(id)) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists) {
+                    break;
+                }
+            }
+            if (!exists) {
+                levels.remove(id);
+            }
+        }
+        for (UUID id : healthOfMobs.keySet().toArray(new UUID[healthOfMobs.keySet().size()])) {
+            boolean exists = false;
+            for (World world : getServer().getWorlds()) {
+                for (Entity ent : world.getEntities()) {
+                    if (ent.getUniqueId().equals(id)) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists) {
+                    break;
+                }
+            }
+            if (!exists) {
+                healthOfMobs.remove(id);
+            }
+        }
+        for (UUID id : invincible.keySet().toArray(new UUID[invincible.keySet().size()])) {
+            boolean exists = false;
+            for (World world : getServer().getWorlds()) {
+                for (Entity ent : world.getEntities()) {
+                    if (ent.getUniqueId().equals(id)) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists) {
+                    break;
+                }
+            }
+            if (!exists) {
+                invincible.remove(id);
+            }
+        }
     }
 }
