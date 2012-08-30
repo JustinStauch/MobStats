@@ -1,8 +1,17 @@
 name: MobStats
-version: 5.1
+version: 5.2
 main: mobstats.MobStats
 authors: [Gamerguy14]
+load: STARTUP
 commands:
   zone:
     description: Tells the player what zone they are in.
+    usage: /[command]
+  MobStats:
+    aliases: ms
+    description: Toggles notifications on and off.
+    usage: /ms [on/true and off/false]
+  replaceall:
+    aliases: ra
+    description: Replaces all LivingEntities that should be StatsEntities with StatsEntities.
     usage: /[command]

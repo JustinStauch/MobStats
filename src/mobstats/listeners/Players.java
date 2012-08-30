@@ -1,10 +1,24 @@
 package mobstats.listeners;
 
 import mobstats.MobStats;
+import mobstats.entities.StatsEntity;
+import mobstats.entities.StatsEntityBlaze;
+import net.minecraft.server.World;
+import org.bukkit.Location;
+import org.bukkit.craftbukkit.CraftServer;
+import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.craftbukkit.entity.CraftBlaze;
+import org.bukkit.craftbukkit.entity.CraftEntity;
 
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
@@ -39,7 +53,7 @@ public class Players implements Listener{
         int startLevel = plugin.level(plugin.closestOriginDistance(event.getFrom()));
         int endLevel = plugin.level(plugin.closestOriginDistance(event.getTo()));
         if (endLevel == startLevel) return;
-        event.getPlayer().sendMessage(plugin.getMessage().replace("+level", String.valueOf(endLevel)));
+        event.getPlayer().sendMessage(plugin.getMessage().replace("-level", String.valueOf(endLevel)));
     }
     
     /**
@@ -49,8 +63,13 @@ public class Players implements Listener{
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
+        if (plugin.sendKillMessage()) {
+            plugin.usesNotifications(event.getPlayer());
+        }
+        Location loco = event.getPlayer().getLocation();
+        World world = ((CraftWorld) loco.getWorld()).getHandle();
         if (!plugin.sendJoinMessage()) return;
-        event.getPlayer().sendMessage(plugin.getJoinMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
+        event.getPlayer().sendMessage(plugin.getJoinMessage().replace("-level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
     
     /**
@@ -62,7 +81,7 @@ public class Players implements Listener{
     public void onPlayerPortalEvent(PlayerPortalEvent event) {
         if (event.isCancelled()) return;
         if (!plugin.sendPortalMessage()) return;
-        event.getPlayer().sendMessage(plugin.getPortalMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
+        event.getPlayer().sendMessage(plugin.getPortalMessage().replace("-level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
     }
     
     /**
@@ -73,7 +92,7 @@ public class Players implements Listener{
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         if (!plugin.sendRespawnMessage()) return;
-        event.getPlayer().sendMessage(plugin.getRespawnMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
+        event.getPlayer().sendMessage(plugin.getRespawnMessage().replace("-level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getRespawnLocation())))));
     }
     
     /**
@@ -85,6 +104,31 @@ public class Players implements Listener{
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         if (event.isCancelled()) return;
         if (!plugin.sendTpMessage()) return;
-        event.getPlayer().sendMessage(plugin.getTpMessage().replace("+level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
+        event.getPlayer().sendMessage(plugin.getTpMessage().replace("-level", String.valueOf(plugin.level(plugin.closestOriginDistance(event.getPlayer().getLocation())))));
+    }
+    
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        EntityDamageEvent ev = event.getEntity().getLastDamageCause();
+        if (!(ev instanceof EntityDamageByEntityEvent)) {
+            return;
+        }
+        if (!plugin.sendDeathMessage()) {
+            return;
+        }
+        Entity damager = ((EntityDamageByEntityEvent) ev).getDamager();
+        if (!(((CraftEntity) damager).getHandle() instanceof StatsEntity)) {
+            return;
+        }
+        if (damager instanceof Projectile) {
+            damager = ((Projectile) damager).getShooter();
+        }
+        if (plugin.isAffected(damager.getType())) {
+            String message = plugin.getDeathMessage();
+            message = message.replaceAll("-mob", damager.getType().toString());
+            message = message.replaceAll("-player", event.getEntity().getDisplayName());
+            message = message.replaceAll("-level", String.valueOf(((StatsEntity) ((CraftEntity) damager).getHandle()).getLevel()));
+            event.setDeathMessage(message);
+        }
     }
 }

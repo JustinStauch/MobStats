@@ -6,17 +6,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
 
+import mobstats.entities.*;
 import mobstats.equations.StatSolver;
 import mobstats.equations.exponential.EMD;
 import mobstats.equations.exponential.EWD;
@@ -30,19 +27,43 @@ import mobstats.listeners.Players;
 
 import net.milkbowl.vault.economy.Economy;
 
-import net.minecraft.server.DamageSource;
-import net.minecraft.server.EntityExperienceOrb;
-import net.minecraft.server.EntityLiving;
+import net.minecraft.server.EntityTypes;
+import org.bukkit.ChatColor;
 
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.craftbukkit.entity.CraftHumanEntity;
+import org.bukkit.craftbukkit.CraftServer;
+import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.craftbukkit.entity.CraftBlaze;
+import org.bukkit.craftbukkit.entity.CraftCaveSpider;
+import org.bukkit.craftbukkit.entity.CraftChicken;
+import org.bukkit.craftbukkit.entity.CraftCow;
+import org.bukkit.craftbukkit.entity.CraftCreeper;
+import org.bukkit.craftbukkit.entity.CraftEnderDragon;
+import org.bukkit.craftbukkit.entity.CraftEntity;
+import org.bukkit.craftbukkit.entity.CraftGhast;
+import org.bukkit.craftbukkit.entity.CraftIronGolem;
 import org.bukkit.craftbukkit.entity.CraftLivingEntity;
-import org.bukkit.entity.Entity;
+import org.bukkit.craftbukkit.entity.CraftMagmaCube;
+import org.bukkit.craftbukkit.entity.CraftMushroomCow;
+import org.bukkit.craftbukkit.entity.CraftOcelot;
+import org.bukkit.craftbukkit.entity.CraftPig;
+import org.bukkit.craftbukkit.entity.CraftPigZombie;
+import org.bukkit.craftbukkit.entity.CraftSheep;
+import org.bukkit.craftbukkit.entity.CraftSilverfish;
+import org.bukkit.craftbukkit.entity.CraftSkeleton;
+import org.bukkit.craftbukkit.entity.CraftSlime;
+import org.bukkit.craftbukkit.entity.CraftSnowman;
+import org.bukkit.craftbukkit.entity.CraftSpider;
+import org.bukkit.craftbukkit.entity.CraftSquid;
+import org.bukkit.craftbukkit.entity.CraftVillager;
+import org.bukkit.craftbukkit.entity.CraftWolf;
+import org.bukkit.craftbukkit.entity.CraftZombie;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -65,18 +86,21 @@ public class MobStats extends JavaPlugin {
     private PluginDescriptionFile info;
     private FileConfiguration config;
     private Map<World, ArrayList<Location>> origins;
-    private String message, joinMessage, portalMessage, respawnMessage, tpMessage;
-    private boolean sendMessage, sendJoinMessage, sendPortalMessage, sendRespawnMessage, sendTpMessage;
+    private String message, joinMessage, portalMessage, respawnMessage, tpMessage, killMessage, deathMessage;
+    private boolean sendMessage, sendJoinMessage, sendPortalMessage, sendRespawnMessage, sendTpMessage, sendKillMessage, sendDeathMessage;
     private StatSolver zones, damage, health, xp, cash;
     private ArrayList<EntityType> affectedMobs;
     private boolean useAffectedMobs;
-    private HashMap<UUID, Integer> levels, healthOfMobs;
-    private HashMap<UUID, Boolean> invincible; 
     private PluginManager manager;
     private ArrayList<Drop> drops;
     private boolean useMoney;
-    private double delay;
     private int levelCap;
+    private HashMap<String, Boolean> notifications;
+    
+    /**
+     * Instance of the main class to be passed to classes created without the ability to have this in the constructor.
+     */
+    private static MobStats plugin;
     
     public static Economy economy = null;
     
@@ -85,62 +109,21 @@ public class MobStats extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-        cleanUpHashMaps();
-        File levelData = new File(getDataFolder(), "levels.data");
-        File healthData = new File(getDataFolder(), "health.data");
-        File invincibleData = new File(getDataFolder(), "invincible.data");
+        File notes = new File(getDataFolder(), "notifications.data");
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
         }
-        if (!levelData.exists()) {
+        if (!notes.exists()) {
             try {
-                levelData.createNewFile();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            }
-        }
-        if (!healthData.exists()) {
-            try {
-                healthData.createNewFile();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            }
-        }
-        if (!invincibleData.exists()) {
-            try {
-                invincibleData.createNewFile();
+                notes.createNewFile();
             } catch (IOException ex) {
                 System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
             }
         }
         ObjectOutputStream out = null;
         try {
-            out =  new ObjectOutputStream(new FileOutputStream(levelData));
-            out.writeObject(levels);
-        } catch (IOException ex) {
-            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-        } finally {
-            try {
-                out.close();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            }
-        }
-        try {
-            out =  new ObjectOutputStream(new FileOutputStream(healthData));
-            out.writeObject(levels);
-        } catch (IOException ex) {
-            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-        } finally {
-            try {
-                out.close();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            }
-        }
-        try {
-            out =  new ObjectOutputStream(new FileOutputStream(invincibleData));
-            out.writeObject(levels);
+            out = new ObjectOutputStream(new FileOutputStream(notes));
+            out.writeObject(notifications);
         } catch (IOException ex) {
             System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
         } finally {
@@ -167,8 +150,11 @@ public class MobStats extends JavaPlugin {
         }
         config = getConfig();
         
-        loadHashMaps();
+        registerClasses();
         getMessages();
+        if (sendKillMessage()) {
+            loadNotifications();
+        }
         setupOrigins();
         setupCash();
         zones = getEquation("Equations.Zone");
@@ -177,7 +163,6 @@ public class MobStats extends JavaPlugin {
         xp = getEquation("Equations.XP");
         setupDrops();
         setupAffectedMobs();
-        delay = config.getDouble("Delay");
         if (!config.contains("Level Cap") || config.getString("Level Cap").equalsIgnoreCase("none") || config.getString("Level Cap").equalsIgnoreCase("n")) {
             levelCap = Integer.MAX_VALUE;
         }
@@ -189,8 +174,23 @@ public class MobStats extends JavaPlugin {
         manager.registerEvents(new Players(this), this);
         
         getCommand("zone").setExecutor(new Commands(this));
+        getCommand("replaceall").setExecutor(new Commands(this));
+        if (sendKillMessage()) {
+            getCommand("MobStats").setExecutor(new Commands(this));
+        }
         
-        fillHashMaps();
+        plugin = this;
+        
+        replaceAllWrongEntities();
+    }
+    
+    /**
+     * Passes the plugin to what ever needs it.
+     * 
+     * @return The instance of the main class of the plugin.
+     */
+    public static MobStats getPlugin() {
+        return plugin;
     }
     
     public boolean sendMessage() {
@@ -233,90 +233,248 @@ public class MobStats extends JavaPlugin {
         return tpMessage;
     }
     
-    /**
-     * Sets the health of the given entity to the given amount.
-     * 
-     * @param entity The Entity to set the health for.
-     * @param amount The amount to set the entity's health to.
-     */
-    public void setHealth(Entity entity, int amount) {
-        UUID id = entity.getUniqueId();
-        healthOfMobs.put(id, amount);
-        invincible.put(id, false);
+    public boolean sendKillMessage() {
+        return sendKillMessage;
     }
     
-    /**
-     * Subtracts the given amount of health from the given entity and kills it if necessary then returns if it killed it or not.
-     * 
-     * @param entity The entity to damage.
-     * @param damage The damage to take off of the entity's health.
-     * @return If the entity died from the subtraction of health.
-     */
-    public boolean subtractHealth(LivingEntity entity, int damage, Entity damager) {
-        UUID id = entity.getUniqueId();
-        int health;
-        if (healthOfMobs.get(id) != null) health = healthOfMobs.get(id);
-        else health = health(getLevel(entity), entity.getMaxHealth());
-        setHealth(entity, health - damage);
-        if (healthOfMobs.get(id) <= 0) {
-            if (damager instanceof Player && useMoney) {
-                Player damagePer = (Player) damager;
-                economy.depositPlayer(damagePer.getName(), cash(getLevel(entity)));
-            }
-            if (entity instanceof CraftLivingEntity) {
-                CraftLivingEntity live = (CraftLivingEntity) entity;
-                EntityLiving li = live.getHandle();
-                if (damager instanceof CraftHumanEntity) {
-                    li.die(DamageSource.playerAttack(((CraftHumanEntity) damager).getHandle()));
-                }
-                else if (damager instanceof CraftLivingEntity) {
-                    li.die(DamageSource.mobAttack(((CraftLivingEntity) damager).getHandle()));
-                }
-                //CraftBukkit code taken from the class net.minecraft.server.EntityLiving in the protected method aI(). Since I was bypassing craftbukkit code I needed to implement some stuff that gets skipped like this which is exp dropping.
-                int i = li.expToDrop;
-                while (i > 0) {
-                    int j = EntityExperienceOrb.getOrbValue(i);
-                    i -= j;
-                    li.world.addEntity(new EntityExperienceOrb(li.world, li.locX, li.locY, li.locZ, j));
-                }
-                //End of craftbukkit code.
-            }
-            entity.remove();//Makes sure the entity is gone.
-            return true;
+    public String getKillMessage() {
+        return killMessage;
+    }
+    
+    public boolean sendDeathMessage() {
+        return sendDeathMessage;
+    }
+    
+    public String getDeathMessage() {
+        return deathMessage;
+    }
+    
+    public boolean usesNotifications(Player player) {
+        if (!sendKillMessage()) {
+            return false;
         }
-        return false;
-    }
-    
-    /**
-     * Checks for if the given Entity is invincible.
-     * 
-     * @param entity The entity to check for invincibility with.
-     * @return If the entity is invincible or not.
-     */
-    public boolean isInvincible(Entity entity) {
-        UUID id = entity.getUniqueId();
-        if (invincible.get(id) == null) {
-            invincible.put(id, false);
+        String name = player.getName();
+        if (!notifications.containsKey(name)) {
+           setUseNotifications(player, true);
         }
-        return invincible.get(entity.getUniqueId());
+        return notifications.get(name);
+    }
+    
+    public void setUseNotifications(Player player, boolean useThem) {
+        notifications.put(player.getName(), useThem);
+        if (useThem) {
+            player.sendMessage(ChatColor.GOLD + "You will recieve a notification everytime someone kills a mob");
+            player.sendMessage(ChatColor.GOLD + "Type " + ChatColor.WHITE + "/ms off" + ChatColor.GOLD + " to turn these off");
+        }
+        else {
+            player.sendMessage(ChatColor.GOLD + "You will not recieve a notification everytime someone kills a mob");
+            player.sendMessage(ChatColor.GOLD + "Type " + ChatColor.WHITE + "/ms on" + ChatColor.GOLD + " to turn notifications on");
+        }
     }
     
     /**
-     * Makes the given Entity invincibility and then sets up a Timer to remove the invincibility.
+     * Sends the notifications that someone has made a kill to everyone who sets up to hear it.
      * 
-     * @param entity The Entity to make invincible.
+     * @param player The Player who got the kill.
+     * @param entity The Entity who was killed.
+     * @param level The level of the Entity that got killed.
+     * @param cash The money that the Player got for the kill.
+     * @param exp The experience dropped by the mob for the gill.
      */
-    public void gotHit(final Entity entity) {
-        invincible.put(entity.getUniqueId(), true);
-        Calendar cal = new GregorianCalendar();
-        Timer time = new Timer();
-        cal.add(Calendar.MILLISECOND, (int) delay * 1000);
-        time.schedule(new TimerTask() {
-            @Override 
-            public void run() {
-                invincible.put(entity.getUniqueId(), false);
+    public void callKillMessages(Player player, LivingEntity entity, int level, double cash, int exp) {
+        if (!sendKillMessage()) {
+            return;
+        }
+        String messageTemp = getKillMessage();
+        messageTemp = messageTemp.replaceAll("-mob", entity.getType().toString());
+        messageTemp = messageTemp.replaceAll("-level", String.valueOf(level));
+        messageTemp = messageTemp.replaceAll("-money", String.valueOf(cash));
+        messageTemp = messageTemp.replaceAll("-exp", String.valueOf(exp));
+        if (usesNotifications(player)) {
+            String tempMessage = messageTemp;
+            tempMessage = tempMessage.replaceAll("-player", "you");
+            player.sendMessage(tempMessage);
+        }
+        messageTemp = messageTemp.replaceAll("-player", player.getDisplayName());
+        for (Player play : getServer().getOnlinePlayers()) {
+            if (usesNotifications(play) && !play.getName().equals(player.getName())) {
+                play.sendMessage(messageTemp);
             }
-        }, cal.getTime());
+        }
+    }
+    
+    public boolean useMoney() {
+        return useMoney;
+    }
+    
+    /**
+     * Replaces the minecraft entity with the equivalent MobStats entities unless it is already replaced.
+     * 
+     * @param bad The entity to be replaced.
+     * @return The entity created.
+     */
+    public LivingEntity replaceEntity(LivingEntity bad, SpawnReason reason, boolean removeOtherEntity) {
+        Location loco = bad.getLocation();
+        World world = loco.getWorld();
+        if (!isAffected(bad.getType())) {
+            return null;
+        }
+        CraftLivingEntity good = null;
+        int level = level(closestOriginDistance(loco));
+        switch (bad.getType()) {
+            case BLAZE:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityBlaze) {
+                    return bad;
+                }
+                good = new CraftBlaze((CraftServer) bad.getServer(), new StatsEntityBlaze(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case CAVE_SPIDER:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityCaveSpider) {
+                    return bad;
+                }
+                good = new CraftCaveSpider((CraftServer) bad.getServer(), new StatsEntityCaveSpider(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case CHICKEN:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityChicken) {
+                    return bad;
+                }
+                good = new CraftChicken((CraftServer) bad.getServer(), new StatsEntityChicken(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case COW:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityCow) {
+                    return bad;
+                }
+                good = new CraftCow((CraftServer) bad.getServer(), new StatsEntityCow(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case CREEPER:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityCreeper) {
+                    return bad;
+                }
+                good = new CraftCreeper((CraftServer) bad.getServer(), new StatsEntityCreeper(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case ENDER_DRAGON:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityEnderDragon) {
+                    return bad;
+                }
+                good = new CraftEnderDragon((CraftServer) bad.getServer(), new StatsEntityEnderDragon(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case ENDERMAN:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityBlaze) {
+                    return bad;
+                }
+                good = new CraftBlaze((CraftServer) bad.getServer(), new StatsEntityBlaze(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case GHAST:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityGhast) {
+                    return bad;
+                }
+                good = new CraftGhast((CraftServer) bad.getServer(), new StatsEntityGhast(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case IRON_GOLEM:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityIronGolem) {
+                    return bad;
+                }
+                good = new CraftIronGolem((CraftServer) bad.getServer(), new StatsEntityIronGolem(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case MAGMA_CUBE:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityMagmaCube) {
+                    return bad;
+                }
+                good = new CraftMagmaCube((CraftServer) bad.getServer(), new StatsEntityMagmaCube(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case MUSHROOM_COW:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityMushroomCow) {
+                    return bad;
+                }
+                good = new CraftMushroomCow((CraftServer) bad.getServer(), new StatsEntityMushroomCow(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case OCELOT:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityOcelot) {
+                    return bad;
+                }
+                good = new CraftOcelot((CraftServer) bad.getServer(), new StatsEntityOcelot(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case PIG:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityPig) {
+                    return bad;
+                }
+                good = new CraftPig((CraftServer) bad.getServer(), new StatsEntityPig(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case PIG_ZOMBIE:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityPigZombie) {
+                    return bad;
+                }
+                good = new CraftPigZombie((CraftServer) bad.getServer(), new StatsEntityPigZombie(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SHEEP:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySheep) {
+                    return bad;
+                }
+                good = new CraftSheep((CraftServer) bad.getServer(), new StatsEntitySheep(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SILVERFISH:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySilverfish) {
+                    return bad;
+                }
+                good = new CraftSilverfish((CraftServer) bad.getServer(), new StatsEntitySilverfish(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SKELETON:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySkeleton) {
+                    return bad;
+                }
+                good = new CraftSkeleton((CraftServer) bad.getServer(), new StatsEntitySkeleton(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SLIME:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySlime) {
+                    return bad;
+                }
+                good = new CraftSlime((CraftServer) bad.getServer(), new StatsEntitySlime(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SNOWMAN:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySnowman) {
+                    return bad;
+                }
+                good = new CraftSnowman((CraftServer) bad.getServer(), new StatsEntitySnowman(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SPIDER:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySpider) {
+                    return bad;
+                }
+                good = new CraftSpider((CraftServer) bad.getServer(), new StatsEntitySpider(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case SQUID:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySquid) {
+                    return bad;
+                }
+                good = new CraftSquid((CraftServer) bad.getServer(), new StatsEntitySquid(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case VILLAGER:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityVillager) {
+                    return bad;
+                }
+                good = new CraftVillager((CraftServer) bad.getServer(), new StatsEntityVillager(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case WOLF:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityWolf) {
+                    return bad;
+                }
+                good = new CraftWolf((CraftServer) bad.getServer(), new StatsEntityWolf(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case ZOMBIE:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityZombie) {
+                    return bad;
+                }
+                good = new CraftZombie((CraftServer) bad.getServer(), new StatsEntityZombie(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+        }
+        good.getHandle().setPosition(loco.getX(), loco.getY(), loco.getZ());
+        good.setHealth(good.getMaxHealth());
+        net.minecraft.server.World worl = ((CraftWorld) world).getHandle();
+        if (removeOtherEntity) {
+            worl.removeEntity(((CraftEntity) bad).getHandle());
+        }
+        worl.addEntity(good.getHandle(), reason);
+        return good;
     }
     
     /**
@@ -324,8 +482,8 @@ public class MobStats extends JavaPlugin {
      * 
      * @param entity The Entity to have its level set.
      */
-    public void setLevel(Entity entity) {
-        levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
+    public void setLevel(LivingEntity entity) {
+        replaceEntity(entity, SpawnReason.CUSTOM, true);
     }
     
     /**
@@ -335,8 +493,8 @@ public class MobStats extends JavaPlugin {
      * @return Whether the entity is affected or not.
      */
     public boolean isAffected(EntityType type) {
-        if (!useAffectedMobs) return true;
         if (type.equals(EntityType.PLAYER)) return false;
+        if (!useAffectedMobs) return true;
         return affectedMobs.contains(type);
     }
     
@@ -393,24 +551,14 @@ public class MobStats extends JavaPlugin {
     }
     
     /**
-     * Gets the level of the given Entity. Sets the Entity's level based on Location if none exists.
-     * 
-     * @param entity The Entity that the level is to be gotten for. Cannot be a Player.
-     * @return The level of the Entity.
-     */
-    public int getLevel(Entity entity) {
-        if (entity instanceof Player) return 0;
-        if (!levels.containsKey(entity.getUniqueId())) levels.put(entity.getUniqueId(), level(closestOriginDistance(entity.getLocation())));
-        return levels.get(entity.getUniqueId());
-    }
-    
-    /**
      * Gets each Drop to check for if it should drop and then drops if it is supposed to.
      * 
      * @param event The EntityDeathEvent that was thrown and holds information for the Drops.
      */
-    public void dropItems(EntityDeathEvent event) {
-        for (Drop x : drops) x.drop(event);
+    public void dropItems(LivingEntity entity) {
+        for (Drop x : drops) {
+            x.drop(entity);
+        }
     }
     
     /**
@@ -421,6 +569,10 @@ public class MobStats extends JavaPlugin {
      */
     public double closestOriginDistance(Location loco) {
         ArrayList<Location> allLoc = origins.get(loco.getWorld());
+        if (allLoc == null || allLoc.isEmpty()) {
+            setupOrigins();
+            allLoc = origins.get(loco.getWorld());
+        }
         double closest = loco.distance(allLoc.get(0));
         for (Location x : allLoc) {
             double temp = loco.distance(x);
@@ -430,85 +582,9 @@ public class MobStats extends JavaPlugin {
     }
     
     /**
-     * Loads the HashMaps out of memory.
+     * Replaces all Entities that aren't StatsEntities but should be with StatsEntities.
      */
-    private void loadHashMaps() {
-        ObjectInputStream in = null;
-        File levelData = new File(getDataFolder(), "levels.data");
-        File healthData = new File(getDataFolder(), "health.data");
-        File invincibleData = new File(getDataFolder(), "invincible.data");
-        if (!levelData.exists()) {
-            levels = new HashMap<UUID, Integer>();
-        }
-        else {
-            try {
-                in = new ObjectInputStream(new FileInputStream(levelData));
-                levels = (HashMap<UUID, Integer>) in.readObject();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } catch (ClassNotFoundException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } finally {
-                try {
-                    in.close();
-                } catch (IOException ex) {
-                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-                }
-            }
-        }
-        if (!healthData.exists()) {
-            healthOfMobs = new HashMap<UUID, Integer>();
-        }
-        else {
-            try {
-                in = new ObjectInputStream(new FileInputStream(healthData));
-                healthOfMobs = (HashMap<UUID, Integer>) in.readObject();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } catch (ClassNotFoundException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } finally {
-                try {
-                    in.close();
-                } catch (IOException ex) {
-                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-                }
-            }
-        }
-        if (!invincibleData.exists()) {
-            invincible = new HashMap<UUID, Boolean>();
-        }
-        else {
-            try {
-                in = new ObjectInputStream(new FileInputStream(invincibleData));
-                invincible = (HashMap<UUID, Boolean>) in.readObject();
-            } catch (IOException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } catch (ClassNotFoundException ex) {
-                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-            } finally {
-                try {
-                    in.close();
-                } catch (IOException ex) {
-                    System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
-                }
-            }
-        }
-        if (levels == null) {
-            levels = new HashMap<UUID, Integer>();
-        }
-        if (healthOfMobs == null) {
-            healthOfMobs = new HashMap<UUID, Integer>();
-        }
-        if (invincible == null) {
-            invincible = new HashMap<UUID, Boolean>();
-        }
-    }
-    
-    /**
-     * Looks through all the entities, calculates there stats, and adds them to HashMaps to store the stats.
-     */
-    private void fillHashMaps() {
+    public void replaceAllWrongEntities() {
         List<World> worlds = getServer().getWorlds();
         for (World world : worlds) {
             List<LivingEntity> entities = world.getLivingEntities();
@@ -516,17 +592,60 @@ public class MobStats extends JavaPlugin {
                 if (!isAffected(entity.getType())) {
                     continue;
                 }
-                UUID id = entity.getUniqueId();
-                if (!levels.containsKey(id)) {
-                    levels.put(id, level(closestOriginDistance(entity.getLocation())));
+                if (((CraftEntity) entity).getHandle() instanceof StatsEntity) {
+                    continue;
                 }
-                if (!healthOfMobs.containsKey(id)) {
-                    healthOfMobs.put(id, health(getLevel(entity), entity.getHealth()));
-                }
-                if(!invincible.containsKey(id)) {
-                    invincible.put(id, false);
-                }
-                entity.setHealth(entity.getMaxHealth());
+                replaceEntity(entity, SpawnReason.CUSTOM, true);
+            }
+        }
+    }
+    
+    /**
+     * Registers the given class to the given ids.
+     * 
+     * @param entity The class to register
+     * @param name The name id of the entity
+     * @param id The int id of the entity
+     */
+    public void executeEntityTypesA(Class entity, String name, int id) {
+        try {
+            Class[] args = new Class[3];
+            args[0] = Class.class;
+            args[1] = String.class;
+            args[2] = int.class;
+            Method a = EntityTypes.class.getDeclaredMethod("a", args);
+            a.setAccessible(true);
+            a.invoke(a, entity, name, id);
+        } catch (NoSuchMethodException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } catch (IllegalAccessException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } catch (InvocationTargetException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        }
+    }
+    
+    private void loadNotifications() {
+        File note = new File(getDataFolder(), "notifications.data");
+        if (!note.exists()) {
+            notifications = new HashMap<String, Boolean>();
+            return;
+        }
+        ObjectInputStream in = null;
+        try {
+            in = new ObjectInputStream(new FileInputStream(note));
+            notifications = (HashMap<String, Boolean>) in.readObject();
+        } catch (IOException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } catch (ClassNotFoundException ex) {
+            System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ex) {
+                System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
             }
         }
     }
@@ -543,11 +662,15 @@ public class MobStats extends JavaPlugin {
             joinMessage = "";
             respawnMessage = "";
             portalMessage = "";
+            killMessage = "";
+            deathMessage = "";
             sendMessage = false;
             sendTpMessage = false;
             sendJoinMessage = false;
             sendRespawnMessage = false;
             sendPortalMessage = false;
+            sendKillMessage = false;
+            sendDeathMessage = false;
             return;
         }
         if (!config.contains("Messages.Message")) {
@@ -642,6 +765,50 @@ public class MobStats extends JavaPlugin {
             else {
                 portalMessage = config.getString("Messages.Portal Message");
                 sendPortalMessage = true;
+            }
+        }
+        if (!config.contains("Messages.Kill Message")) {
+            killMessage = "";
+            sendKillMessage = false;
+        }
+        else if (config.isBoolean("Messages.Kill Message")) {
+            if (!config.getBoolean("Messages.Kill Message")) {
+                sendKillMessage = false;
+            }
+            else {
+                killMessage = "true";
+                sendKillMessage = true;
+            }
+        }
+        else if (config.isString("Messages.Kill Message")) {
+            if (config.getString("Messages.Kill Message").equalsIgnoreCase("false")) {
+                sendKillMessage = false;
+            }
+            else {
+                killMessage = config.getString("Messages.Kill Message");
+                sendKillMessage = true;
+            }
+        }
+        if (!config.contains("Messages.Death Message")) {
+            deathMessage = "";
+            sendDeathMessage = false;
+        }
+        else if (config.isBoolean("Messages.Death Message")) {
+            if (!config.getBoolean("Messages.Death Message")) {
+                sendDeathMessage = false;
+            }
+            else {
+                deathMessage = "true";
+                sendDeathMessage = true;
+            }
+        }
+        else if (config.isString("Messages.Death Message")) {
+            if (config.getString("Messages.Death Message").equalsIgnoreCase("false")) {
+                sendDeathMessage = false;
+            }
+            else {
+                deathMessage = config.getString("Messages.Death Message");
+                sendDeathMessage = true;
             }
         }
     }
@@ -943,66 +1110,82 @@ public class MobStats extends JavaPlugin {
         return new Location(world, x, y, z);
     }
     
+    /**
+     * Creates a list of all the entity types that are alive except players.
+     * 
+     * @return List of all living non-player entities.
+     */
     private ArrayList<EntityType> getListOfAllTypes() {
         ArrayList<EntityType> entities = new ArrayList<EntityType>();
         EntityType[] entity = EntityType.values();
-        entities.addAll(Arrays.asList(entity));
+        for (EntityType ent : entity) {
+            if (ent.isAlive() && ent != EntityType.PLAYER) {
+                entities.add(ent);
+            }
+        }
         return entities;
     }
     
-    /**
-     * Removes all mobs that are stored in a HashMap but do not exist.
-     */
-    private void cleanUpHashMaps() {
-        for (UUID id : levels.keySet().toArray(new UUID[levels.keySet().size()])) {
-            boolean exists = false;
-            for (World world : getServer().getWorlds()) {
-                for (Entity ent : world.getEntities()) {
-                    if (ent.getUniqueId().equals(id)) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (exists) {
-                    break;
-                }
-            }
-            if (!exists) {
-                levels.remove(id);
-            }
+    public Class getEntityClass(EntityType ent) {
+        switch (ent) {
+            case BLAZE:
+                return StatsEntityBlaze.class;
+            case CAVE_SPIDER:
+                return StatsEntityCaveSpider.class;
+            case CHICKEN:
+                return StatsEntityChicken.class;
+            case COW:
+                return StatsEntityCow.class;
+            case CREEPER:
+                return StatsEntityCreeper.class;
+            case ENDER_DRAGON:
+                return StatsEntityEnderDragon.class;
+            case ENDERMAN:
+                return StatsEntityEnderman.class;
+            case GHAST:
+                return StatsEntityGhast.class;
+            case GIANT:
+                return StatsEntityGiant.class;
+            case IRON_GOLEM:
+                return StatsEntityIronGolem.class;
+            case MAGMA_CUBE:
+                return StatsEntityMagmaCube.class;
+            case MUSHROOM_COW:
+                return StatsEntityMushroomCow.class;
+            case OCELOT:
+                return StatsEntityOcelot.class;
+            case PIG:
+                return StatsEntityPig.class;
+            case PIG_ZOMBIE:
+                return StatsEntityPigZombie.class;
+            case SHEEP:
+                return StatsEntitySheep.class;
+            case SILVERFISH:
+                return StatsEntitySilverfish.class;
+            case SKELETON:
+                return StatsEntitySkeleton.class;
+            case SLIME:
+                return StatsEntitySlime.class;
+            case SNOWMAN:
+                return StatsEntitySnowman.class;
+            case SPIDER:
+                return StatsEntitySpider.class;
+            case SQUID:
+                return StatsEntitySquid.class;
+            case VILLAGER:
+                return StatsEntityVillager.class;
+            case WOLF:
+                return StatsEntityWolf.class;
+            case ZOMBIE:
+                return StatsEntityZombie.class;
         }
-        for (UUID id : healthOfMobs.keySet().toArray(new UUID[healthOfMobs.keySet().size()])) {
-            boolean exists = false;
-            for (World world : getServer().getWorlds()) {
-                for (Entity ent : world.getEntities()) {
-                    if (ent.getUniqueId().equals(id)) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (exists) {
-                    break;
-                }
-            }
-            if (!exists) {
-                healthOfMobs.remove(id);
-            }
-        }
-        for (UUID id : invincible.keySet().toArray(new UUID[invincible.keySet().size()])) {
-            boolean exists = false;
-            for (World world : getServer().getWorlds()) {
-                for (Entity ent : world.getEntities()) {
-                    if (ent.getUniqueId().equals(id)) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (exists) {
-                    break;
-                }
-            }
-            if (!exists) {
-                invincible.remove(id);
+        return null;
+    }
+    
+    private void registerClasses() {
+        for (EntityType ent : getListOfAllTypes()) {
+            if (isAffected(ent) && ent.isAlive()) {
+                executeEntityTypesA(getEntityClass(ent), ent.toString(), ent.getTypeId());
             }
         }
     }

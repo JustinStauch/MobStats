@@ -3,7 +3,10 @@ package mobstats;
 import java.util.ArrayList;
 
 import java.util.Random;
+import mobstats.entities.StatsEntity;
+import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -49,15 +52,22 @@ public class Drop {
      * 
      * @param event The event that was thrown to be used to find the required information.
      */
-    public void drop(EntityDeathEvent event) {
-        int level = plugin.getLevel(event.getEntity());
+    public void drop(LivingEntity entity) {
+        if (!(((CraftEntity) entity).getHandle() instanceof StatsEntity)) {
+            throw new IllegalArgumentException("The entity wasn't changed to a proper entity.");
+        }
+        int level = ((StatsEntity) ((CraftEntity) entity).getHandle()).getLevel();
         if (level >= startZone && (level <= endZone || endZone == -1)) {
-            if (!mobs.isEmpty() && !mobs.contains(event.getEntityType())) {
+            if (!mobs.isEmpty() && !mobs.contains(entity.getType())) {
                 return;
             }
             Random random = new Random();
             int chosen = random.nextInt(denominator);
-            if (chosen < numerator) for (ItemStack x : drops) event.getEntity().getLocation().getWorld().dropItem(event.getEntity().getLocation(), x);
+            if (chosen < numerator) {
+                for (ItemStack x : drops) {
+                    entity.getLocation().getWorld().dropItemNaturally(entity.getLocation(), x);
+                }
+            }
         }
     }
 }
