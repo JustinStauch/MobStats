@@ -1,7 +1,10 @@
 package mobstats.pathfinders;
 
+import arrowpro.arrow.ArrowType;
+import arrowpro.arrow.ProArrow;
 import mobstats.MobStats;
 import mobstats.entities.StatsEntity;
+import mobstats.entities.StatsEntitySkeleton;
 
 import net.minecraft.server.EntityArrow;
 import net.minecraft.server.EntityLiving;
@@ -91,9 +94,10 @@ public class StatsPathfinderGoalArrowAttack extends PathfinderGoalArrowAttack {
         }
     }
     
-    private void f() {
+    protected void f() {
         if (this.g == 1) {
-            EntityArrow entityarrow = new EntityArrow(this.a, this.b, this.c, 1.6F, 12.0F);
+            EntityArrow entityarrow;
+            entityarrow = new EntityArrow(this.a, this.b, this.c, 1.6F, 12.0F);
             if (b instanceof StatsEntity) {
                 entityarrow.b(MobStats.getPlugin().damage(((StatsEntity) b).getLevel(), entityarrow.d()));
             }

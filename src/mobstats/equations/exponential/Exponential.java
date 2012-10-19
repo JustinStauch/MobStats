@@ -14,19 +14,22 @@ import mobstats.equations.StatSolver;
  * copyright 2012© Justin Stauch, All Rights Reserved
  */
 public class Exponential implements StatSolver {
-    private double a, b, c, d, f;
+    private double a, b, c, d, f, max, min;
     
-    public Exponential(double a, double b, double c, double d, double f) {
+    public Exponential(double a, double b, double c, double d, double f, double max, double min) {
         this.a = a;
         this.b = b;
         this.c = c;
         this.d = d;
         this.f = f;
+        this.max = max;
+        this.min = min;
     }
 
     @Override
     public double solve(double x, double def) {
         double powered = Math.pow(b, c * (x - d));
-        return (a * powered) + f;
+        double result = (a * powered) + f;
+        return result < min ? min : result > max ? max : result;
     }
 }

@@ -9,7 +9,7 @@ import mobstats.equations.StatSolver;
  * By putting a as 0, a linear equation is created which has a straight line where two consecutive integer values for x put through the equation will have a difference of b.
  * The equation will always be c when x is 0.
  * Setting a and b as 0 will always give the same result.
- * The vertex is the point that can only be reached with one value for x.
+ * The vertex is the point with the y value that can only be reached with one value for x.
  * For positive values of a, the vertex has the lowest possible y value for the equation and for negative values of a, the vertex has the highest possible y value for the equation.
  * When b is zero,the vertex has an x value of zero and a y value of c.
  * 
@@ -19,7 +19,7 @@ import mobstats.equations.StatSolver;
  * copyright 2012© Justin Stauch, All Rights Reserved
  */
 public class Quadratic implements StatSolver {
-    private double a, b, c;
+    private double a, b, c, max, min;
     
     /**
      * Creates a knew Quadratic formula with the given values.
@@ -27,11 +27,15 @@ public class Quadratic implements StatSolver {
      * @param a The a value of the equation.
      * @param b The b value of the equation.
      * @param c The c value of the equation.
+     * @param max The maximum value.
+     * @param min The minimum value.
      */
-    public Quadratic(double a, double b, double c) {
+    public Quadratic(double a, double b, double c, double max, double min) {
         this.a = a;
         this.b = b;
         this.c = c;
+        this.max = max;
+        this.min = min;
     }
     
     /**
@@ -49,33 +53,6 @@ public class Quadratic implements StatSolver {
     }
     
     /**
-     * Gets the a value in the equation.
-     * 
-     * @return The a value in the equation.
-     */
-    public double getA() {
-        return a;
-    }
-    
-    /**
-     * Gets the b value in the equation.
-     * 
-     * @return The b value in the equation.
-     */
-    public double getB() {
-        return b;
-    }
-    
-    /**
-     * Gets the c value in the equation.
-     * 
-     * @return The c value in the equation.
-     */
-    public double getC() {
-        return c;
-    }
-    
-    /**
      * Solves the equation.
      * 
      * @param x The value to use as x.
@@ -83,7 +60,7 @@ public class Quadratic implements StatSolver {
      */
     @Override
     public double solve(double x, double def) {
-        return a*(x*x) + b*x + c;
+        double result = a*(x*x) + b*x + c;
+        return result < min ? min : result > max ? max : result;
     }
-    
 }

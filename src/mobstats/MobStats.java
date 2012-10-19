@@ -1,5 +1,6 @@
 package mobstats;
 
+import arrowpro.arrow.ArrowType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -28,8 +29,8 @@ import mobstats.listeners.Players;
 import net.milkbowl.vault.economy.Economy;
 
 import net.minecraft.server.EntityTypes;
-import org.bukkit.ChatColor;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -64,8 +65,8 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
-import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -88,13 +89,12 @@ public class MobStats extends JavaPlugin {
     private Map<World, ArrayList<Location>> origins;
     private String message, joinMessage, portalMessage, respawnMessage, tpMessage, killMessage, deathMessage;
     private boolean sendMessage, sendJoinMessage, sendPortalMessage, sendRespawnMessage, sendTpMessage, sendKillMessage, sendDeathMessage;
-    private StatSolver zones, damage, health, xp, cash;
+    private StatSolver zones, damage, health, xp, cash, arrowPro;
     private ArrayList<EntityType> affectedMobs;
     private boolean useAffectedMobs;
     private PluginManager manager;
     private ArrayList<Drop> drops;
     private boolean useMoney;
-    private int levelCap;
     private HashMap<String, Boolean> notifications;
     
     /**
@@ -133,6 +133,8 @@ public class MobStats extends JavaPlugin {
                 System.out.println("[" + info.getName() + "] Error: " + ex.getMessage());
             }
         }
+        plugin = null;
+        economy = null;
     }
     
     /**
@@ -163,11 +165,9 @@ public class MobStats extends JavaPlugin {
         xp = getEquation("Equations.XP");
         setupDrops();
         setupAffectedMobs();
-        if (!config.contains("Level Cap") || config.getString("Level Cap").equalsIgnoreCase("none") || config.getString("Level Cap").equalsIgnoreCase("n")) {
-            levelCap = Integer.MAX_VALUE;
-        }
-        else {
-            levelCap = config.getInt("Level Cap");
+        
+        if (isArrowProLoaded()) {
+            StatsEntitySkeleton.arrow = ArrowType.fromName(config.getString("Skeleton Arrow"));
         }
         
         manager.registerEvents(new Entities(this), this);
@@ -182,6 +182,20 @@ public class MobStats extends JavaPlugin {
         plugin = this;
         
         replaceAllWrongEntities();
+    }
+    
+    public boolean isArrowProLoaded() {
+        Plugin[] plugins = manager.getPlugins();
+        int found = 0;
+        for (Plugin plug : plugins) {
+            for (String dep : getDescription().getSoftDepend()) {
+                if (plug.getDescription().getName().equalsIgnoreCase(dep)) {
+                    found++;
+                    break;
+                }
+            }
+        }
+        return found >= getDescription().getSoftDepend().size();
     }
     
     /**
@@ -505,8 +519,7 @@ public class MobStats extends JavaPlugin {
      * @return The mobs level.
      */
     public int level(double distance) {
-        int level = Double.valueOf(Math.floor(zones.solve(distance, 0))).intValue();
-        return level > levelCap ? levelCap : level;
+        return Double.valueOf(Math.floor(zones.solve(distance, 0))).intValue();
     }
     
     /**
@@ -876,108 +889,183 @@ public class MobStats extends JavaPlugin {
      * @return The equation from the given path.
      */
     private StatSolver getEquation(String path) {
-        if (config.getString(path + ".Type").equalsIgnoreCase("quadratic")) {
-            double a, b, c;
-            a = config.getDouble(path + ".a");
-            b = config.getDouble(path + ".b");
-            c = config.getDouble(path + ".c");
-            return new Quadratic(a, b, c);
+        if (!getConfig().contains(path)) {
+            return new QMD(0, 0, 1, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
         }
-        if (config.getString(path + ".Type").equalsIgnoreCase("QWD")) {
-            double a, b, c;
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("quadratic")) {
+            double a, b, c, max, min;
+            a = getConfig().getDouble(path + ".a");
+            b = getConfig().getDouble(path + ".b");
+            c = getConfig().getDouble(path + ".c");
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new Quadratic(a, b, c, max, min);
+        }
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("QWD")) {
+            double a, b, c, max, min;
             boolean aDef, bDef, cDef;
             String hold;
-            hold = config.getString(path + ".a");
+            hold = getConfig().getString(path + ".a");
             if (hold.contains("d")) {
                 aDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
                 System.out.println(hold);
             }
             else aDef = false;
             a = Double.parseDouble(hold);
-            hold = config.getString(path + ".b");
+            hold = getConfig().getString(path + ".b");
             if (hold.contains("d")) {
                 bDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else bDef = false;
             b = Double.parseDouble(hold);
-            hold = config.getString(path + ".c");
+            hold = getConfig().getString(path + ".c");
             if (hold.contains("d")) {
                 cDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else cDef = false;
             c = Double.parseDouble(hold);
-            return new QWD(a, b, c, aDef, bDef, cDef);
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new QWD(a, b, c, max, min, aDef, bDef, cDef);
         }
-        if (config.getString(path + ".Type").equalsIgnoreCase("QMD")) {
-            double a, b, c;
-            a = config.getDouble(path + ".a");
-            b = config.getDouble(path + ".b");
-            c = config.getDouble(path + ".c");
-            return new QMD(a, b, c);
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("QMD")) {
+            double a, b, c, max, min;
+            a = getConfig().getDouble(path + ".a");
+            b = getConfig().getDouble(path + ".b");
+            c = getConfig().getDouble(path + ".c");
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new QMD(a, b, c, max, min);
         }
-        if (config.getString(path + ".Type").equalsIgnoreCase("exponential")) {
-            double a, b, c, d, f;
-            a = config.getDouble(path + ".a");
-            b = config.getDouble(path + ".b");
-            c = config.getDouble(path + ".c");
-            d = config.getDouble(path + ".d");
-            f = config.getDouble(path + ".f");
-            return new Exponential(a, b, c, d, f);
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("exponential")) {
+            double a, b, c, d, f, max, min;
+            a = getConfig().getDouble(path + ".a");
+            b = getConfig().getDouble(path + ".b");
+            c = getConfig().getDouble(path + ".c");
+            d = getConfig().getDouble(path + ".d");
+            f = getConfig().getDouble(path + ".f");
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new Exponential(a, b, c, d, f, max, min);
         }
-        if (config.getString(path + ".Type").equalsIgnoreCase("EWD")) {
-            double a, b, c, d, f;
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("EWD")) {
+            double a, b, c, d, f, max, min;
             boolean aDef, bDef, cDef, dDef, fDef;
             String hold;
-            hold = config.getString(path + ".a");
+            hold = getConfig().getString(path + ".a");
             if (hold.contains("d")) {
                 aDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else aDef = false;
             a = Double.parseDouble(hold);
-            hold = config.getString(path + ".b");
+            hold = getConfig().getString(path + ".b");
             if (hold.contains("d")) {
                 bDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else bDef = false;
             b = Double.parseDouble(hold);
-            hold = config.getString(path + ".c");
+            hold = getConfig().getString(path + ".c");
             if (hold.contains("d")) {
                 cDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else cDef = false;
             c = Double.parseDouble(hold);
-            hold = config.getString(path + ".d");
+            hold = getConfig().getString(path + ".d");
             if (hold.contains("d")) {
                 dDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else dDef = false;
             d = Double.parseDouble(hold);
-            hold = config.getString(path + ".f");
+            hold = getConfig().getString(path + ".f");
             if (hold.contains("d")) {
                 fDef = true;
-                hold.replaceAll("d", "");
+                hold = hold.replaceAll("d", "");
             }
             else fDef = false;
             f = Double.parseDouble(hold);
-            return new EWD(a, b, c, d, f, aDef, bDef, cDef, dDef, fDef);
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new EWD(a, b, c, d, f, max, min, aDef, bDef, cDef, dDef, fDef);
         }
-        if (config.getString(path + ".Type").equalsIgnoreCase("EMD")) {
-            double a, b, c, d, f;
-            a = config.getDouble(path + ".a");
-            b = config.getDouble(path + ".b");
-            c = config.getDouble(path + ".c");
-            d = config.getDouble(path + ".d");
-            f = config.getDouble(path + ".f");
-            return new EMD(a, b, c, d, f);
+        if (getConfig().getString(path + ".Type").equalsIgnoreCase("EMD")) {
+            double a, b, c, d, f, max, min;
+            a = getConfig().getDouble(path + ".a");
+            b = getConfig().getDouble(path + ".b");
+            c = getConfig().getDouble(path + ".c");
+            d = getConfig().getDouble(path + ".d");
+            f = getConfig().getDouble(path + ".f");
+            if (getConfig().contains(path + ".max")) {
+                max = getConfig().getDouble(path + ".max");
+            }
+            else {
+                max = Double.POSITIVE_INFINITY;
+            }
+            if (getConfig().contains(path + "min")) {
+                min = getConfig().getDouble(path + ".min");
+            }
+            else {
+                min = Double.NEGATIVE_INFINITY;
+            }
+            return new EMD(a, b, c, d, f, max, min);
         }
-        return null;
+        return new QMD(0, 0, 1, 1, 1);//Just makes it so that it isn't modified, it creates this function: ⨍(x) = 1 and then returns ⨍(x)(the default value).
     }
     
     /**

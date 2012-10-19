@@ -10,8 +10,8 @@ package mobstats.equations.exponential;
  */
 public class EMD extends Exponential {
     
-    public EMD(double a, double b, double c, double d, double f) {
-        super(a, b, c, d, f);
+    public EMD(double a, double b, double c, double d, double f, double max, double min) {
+        super(a, b, c, d, f, max, min);
     }
     
     @Override

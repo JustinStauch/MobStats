@@ -104,7 +104,7 @@ public class StatsEntityGhast extends EntityGhast implements StatsEntity {
             if (this.a-- <= 0) {
                 this.a += this.random.nextInt(5) + 2;
                 d3 = (double) MathHelper.sqrt(d3);
-                Method a = EntityGhast.class.getMethod("a", double.class, double.class, double.class, double.class);
+                Method a = EntityGhast.class.getDeclaredMethod("a", double.class, double.class, double.class, double.class);
                 a.setAccessible(true);
                 EntityGhast ghast = this;
                 if ((Boolean) a.invoke(ghast, this.b, this.c, this.d, d3)) {

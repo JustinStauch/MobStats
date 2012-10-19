@@ -1,8 +1,9 @@
 name: MobStats
-version: 5.2
+version: 5.3
 main: mobstats.MobStats
 authors: [Gamerguy14]
 load: STARTUP
+softdepend: [ArrowPro]
 commands:
   zone:
     description: Tells the player what zone they are in.

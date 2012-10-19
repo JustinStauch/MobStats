@@ -13,16 +13,18 @@ package mobstats.equations.exponential;
  * copyright 2012© Justin Stauch, All Rights Reserved
  */
 public class EWD extends Exponential {
-    private double a, b, c, d, f;
+    private double a, b, c, d, f, max, min;
     private boolean aDef, bDef, cDef, dDef, fDef;
     
-    public EWD(double a, double b, double c, double d, double f, boolean aDef, boolean bDef, boolean cDef, boolean dDef, boolean fDef) {
-        super(a, b, c, d, f);
+    public EWD(double a, double b, double c, double d, double f, double max, double min, boolean aDef, boolean bDef, boolean cDef, boolean dDef, boolean fDef) {
+        super(a, b, c, d, f, max, min);
         this.a = a;
         this.b = b;
         this.c = c;
         this.d = d;
         this.f = f;
+        this.max = max;
+        this.min = min;
         this.aDef = aDef;
         this.bDef = bDef;
         this.cDef = cDef;
@@ -39,6 +41,7 @@ public class EWD extends Exponential {
         if (dDef) dNew *= def;
         if (fDef) fNew *= def;
         double powered = Math.pow(bNew, cNew * (x - dNew));
-        return (aNew * powered) + fNew;
+        double result = (aNew * powered) + fNew;
+        return result < min ? min : result > max ? max : result;
     }
 }

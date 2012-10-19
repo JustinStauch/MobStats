@@ -2,6 +2,7 @@
 # Type the desired message for each type using "-level" to place the level in. Typing "false" or nothing to turn the message off.
 # Kill Message is sent to everyone who sets themselves up to recieve notifications. -player is replaced with the player who got the kill, -mob is replaced by the type of the killed mob, -level is replaced by the mob's level, and -money and -exp or the money and exp earned respectively.
 # Death Message is the message displayed on the death of someone. +player is the player that died, +mob is the type of the mob that killed the Player and +level is the mob's level.
+# The Skeleton Arrow part only works if you have ArrowPro enabled. Type an Arrows FULL NAME and the skeletons will shoot that.
 # Origins is used to configure Locations to centre levels around. Levels change based on the distance from the closest origin point.
 # Type the name of the world in Origins followed by a list of Locations by placing a hyphen before each Location.
 # Type the Location in the form of x,y,z or type spawn to make the point the spawn.
@@ -14,9 +15,10 @@
 #   QMD: The same as a quadratic but the whole equation is multiplied by the default value.
 #   Exponential: This is an equation in the form of a(b^(c(x - d))) + f.
 #   EWD: The same as QWD but the equation used is Exponential. The format is the same.
-#   EMD: The same as QMD but the equation used is Exponential.
+#   EMD: The same as QMD but the equation used is Exponential
 # c is the value when x is 0 for quadratics and f + a is the value when x is 0 for exponential equations.
 # There is no e for exponential equations because e is a constant that represents the base for natural log.
+# All equations contain a maximum(max) and minimum(min) value but these are optional.
 # Zone is the level of the area. It is found by subbing the distance from the closest origin in for x in the quadratic equation.
 # Health is the health that a mob will have at a certain level. The level is subbed in for x.
 # Damage is the damage that a mob will deal at a certain level. The level is subbed in for x.
@@ -29,7 +31,6 @@
 # For the odds, type a fraction for the odds. If the number is a whole number, the numerator is larger or equal to the denominator, or none are included, the drop will drop all the time.
 # If the list of mobs is not included, all mobs will follow this drop.
 # IMPORTANT: When removing a section from a drop, create a new drop instead of removing the section.
-# The Level Cap is the maximum level to have mobs reach, any zone where based on the equation should be higher than the cap will be a the cap.
 # Affected Mobs is all the mobs that will be affected by this plugin. Place a list of all the mobs that are to be affected.
 # A list is made by placing names on top of each other with a hyphen beside each one.
 # Erase the section to enable all mobs.
@@ -43,6 +44,7 @@ Messages:
   TP Message: You have just teleported into a level -level zone.
   Kill Message: -player killed a level -level -mob and recieved -exp exp and $-money.
   Death Message: -player has been killed by a level -level -mob.
+Skeleton Arrow: TNT Arrow
 Origins:
   world: 
     - spawn

@@ -9,7 +9,6 @@ import net.minecraft.server.Entity;
 
 import net.minecraft.server.EntityBlaze;
 import net.minecraft.server.EntityHuman;
-import net.minecraft.server.EntitySmallFireball;
 import net.minecraft.server.MathHelper;
 import net.minecraft.server.MobEffectList;
 import net.minecraft.server.World;
@@ -28,7 +27,8 @@ public class StatsEntityBlaze extends EntityBlaze implements StatsEntity {
     private int maxHealth;
     
     public StatsEntityBlaze(World world) {
-        super(world);level = MobStats.getPlugin().level(MobStats.getPlugin().closestOriginDistance(new Location(this.world.getWorld(), locX, locY, locZ)));
+        super(world);
+        level = MobStats.getPlugin().level(MobStats.getPlugin().closestOriginDistance(new Location(this.world.getWorld(), locX, locY, locZ)));
         maxHealth = MobStats.getPlugin().health(level, super.getMaxHealth());
     }
     
@@ -114,7 +114,7 @@ public class StatsEntityBlaze extends EntityBlaze implements StatsEntity {
             if (this.attackTicks == 0) {
                 int g = 0;
                 try {
-                    Field ge = EntityBlaze.class.getField("g");
+                    Field ge = EntityBlaze.class.getDeclaredField("g");
                     ge.setAccessible(true);
                     EntityBlaze blaze = this;
                     g = ge.getInt(blaze);

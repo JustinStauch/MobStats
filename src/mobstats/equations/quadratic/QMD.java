@@ -16,9 +16,11 @@ public class QMD extends Quadratic {
      * @param a The a value to use.
      * @param b The b value to use.
      * @param c The c value to use.
+     * @param max The maximum value.
+     * @param min The minimum value.
      */
-    public QMD(double a, double b, double c) {
-        super(a, b, c);
+    public QMD(double a, double b, double c, double max, double min) {
+        super(a, b, c, max, min);
     }
     
     /**
