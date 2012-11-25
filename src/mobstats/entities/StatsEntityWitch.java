@@ -1,10 +1,12 @@
 package mobstats.entities;
 
 import mobstats.MobStats;
+
 import net.minecraft.server.DamageSource;
 import net.minecraft.server.Entity;
-import net.minecraft.server.EntityEnderman;
+import net.minecraft.server.EntityWitch;
 import net.minecraft.server.World;
+
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -12,19 +14,19 @@ import org.bukkit.entity.Player;
 /**
  *
  * @author Justin Stauch
- * @since August 24, 2012
+ * @since November 10, 2012
  */
-public class StatsEntityEnderman extends EntityEnderman implements StatsEntity {
+public class StatsEntityWitch extends EntityWitch implements StatsEntity {
     private int level;
     private int maxHealth;
     
-    public StatsEntityEnderman(World world) {
+    public StatsEntityWitch(World world) {
         super(world);
         level = MobStats.getPlugin().level(MobStats.getPlugin().closestOriginDistance(new Location(this.world.getWorld(), locX, locY, locZ)));
         maxHealth = MobStats.getPlugin().health(level, super.getMaxHealth());
     }
     
-    public StatsEntityEnderman(World world, int level, int maxHealth) {
+    public StatsEntityWitch(World world, int level, int maxHealth) {
         super(world);
         this.level = level;
         this.maxHealth = maxHealth;

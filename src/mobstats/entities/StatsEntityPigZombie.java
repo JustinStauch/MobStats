@@ -1,11 +1,12 @@
 package mobstats.entities;
 
 import mobstats.MobStats;
+
 import net.minecraft.server.DamageSource;
 import net.minecraft.server.Entity;
 import net.minecraft.server.EntityPigZombie;
-import net.minecraft.server.MobEffectList;
 import net.minecraft.server.World;
+
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -41,26 +42,9 @@ public class StatsEntityPigZombie extends EntityPigZombie implements StatsEntity
         return level;
     }
     
-    /**
-     * This method is the same as the one from net.minecraft.server.EntityMonster with the difference of modifying the damage with the plugin's damage equation.
-     * 
-     * @see net.minecraft.server.EntityMonster
-     * @param entity
-     * @return 
-     */
     @Override
-    public boolean k(Entity entity) {
-        int i = damage;
-        if (hasEffect(MobEffectList.INCREASE_DAMAGE)) {
-            i += 3 << getEffect(MobEffectList.INCREASE_DAMAGE).getAmplifier();
-        }
-        if (hasEffect(MobEffectList.WEAKNESS)) {
-            i -= 2 << getEffect(MobEffectList.WEAKNESS).getAmplifier();
-        }
-        //MobStats - Change damage based on the level of the mob.
-        i = MobStats.getPlugin().damage(level, i);
-        //MobStats end
-        return entity.damageEntity(DamageSource.mobAttack(this), i);
+    public int c(Entity entity) {
+        return MobStats.getPlugin().damage(level, super.c(entity));
     }
     
     @Override

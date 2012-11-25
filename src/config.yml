@@ -2,11 +2,12 @@
 # Type the desired message for each type using "-level" to place the level in. Typing "false" or nothing to turn the message off.
 # Kill Message is sent to everyone who sets themselves up to recieve notifications. -player is replaced with the player who got the kill, -mob is replaced by the type of the killed mob, -level is replaced by the mob's level, and -money and -exp or the money and exp earned respectively.
 # Death Message is the message displayed on the death of someone. +player is the player that died, +mob is the type of the mob that killed the Player and +level is the mob's level.
-# The Skeleton Arrow part only works if you have ArrowPro enabled. Type an Arrows FULL NAME and the skeletons will shoot that.
+
 # Origins is used to configure Locations to centre levels around. Levels change based on the distance from the closest origin point.
 # Type the name of the world in Origins followed by a list of Locations by placing a hyphen before each Location.
 # Type the Location in the form of x,y,z or type spawn to make the point the spawn.
 # IMPORTANT: Replace world with the name of your world and put lists for other worlds the same way.
+
 # Equations is used to make equations for each modification in the plugin.
 # Type all the required variables for each equation. These are the ones listed in the sample equations in the type descriptions.
 # The possible types are:
@@ -25,12 +26,19 @@
 # XP is the amount of exp that a mob will drop when killed at a certain level. The level is subbed in for x.
 # Money is the amount of money that the player who killed the mob will be rewarded upon killing the entity. The leel is subbed in for x.
 # IMPORTANT: Don't set equations so that they will get to high because it will ruin the game. Too high damage will kill the Player but they would still walk around like a ghost, immortal and can't interact with surroundings.
+
 # Under Drops, type a list of drops that are wanted. Type any String in the list, the worlds are just to show where the drop options are.
 # For each word typed under Drops, make a section for it. In each section there should be a list of all the mobs for the drop, the start zone, the end zone, the odds, and a list of the items.
 # If there is no start zone included, it will start at level 0. If there is no end zone included, it will go on forever.
 # For the odds, type a fraction for the odds. If the number is a whole number, the numerator is larger or equal to the denominator, or none are included, the drop will drop all the time.
 # If the list of mobs is not included, all mobs will follow this drop.
 # IMPORTANT: When removing a section from a drop, create a new drop instead of removing the section.
+
+# Equipment works the same as drops except put the names under Equipment.
+# Also when writing items, a third number may be placed to show the equipment section to put the item in. (Hands is 0, then it goes boots, leggings, chest, head which is 4).
+# Without the number, the items will be put in the order that they are listed.
+# Put the abbreviation for an arrow if ArrowPro is enabled as the item be used by skeletons.
+
 # Affected Mobs is all the mobs that will be affected by this plugin. Place a list of all the mobs that are to be affected.
 # A list is made by placing names on top of each other with a hyphen beside each one.
 # Erase the section to enable all mobs.
@@ -44,7 +52,6 @@ Messages:
   TP Message: You have just teleported into a level -level zone.
   Kill Message: -player killed a level -level -mob and recieved -exp exp and $-money.
   Death Message: -player has been killed by a level -level -mob.
-Skeleton Arrow: TNT Arrow
 Origins:
   world: 
     - spawn
@@ -84,6 +91,29 @@ Zombie:
   Odds: 2/100
   Items:
     - 367,1
+Equipment:
+  - Skeleton
+  - Armor
+Skeleton:
+  Mobs:
+    - Skeleton
+  Start Zone: 10
+  End Zone: 30
+  Odds: 1/2
+  Items:
+    - tnt, 1, 0
+Armor:
+  Mobs:
+    - Zombie
+    - Skeleton
+  Start Zone: 5
+  End Zone: 25
+  Odds: 1/2
+  Items:
+    - 313, 1, 1
+    - 312, 1, 2
+    - 311, 1, 3
+    - 310, 1, 4
 Level Cap: none
 Affected Mobs:
   - Creeper
@@ -112,3 +142,6 @@ Affected Mobs:
   - Ozelot
   - VillagerGolem
   - Villager
+  - Bat
+  - Witch
+  - Wither

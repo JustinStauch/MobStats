@@ -4,6 +4,7 @@ import mobstats.MobStats;
 import net.minecraft.server.DamageSource;
 import net.minecraft.server.EntityHuman;
 import net.minecraft.server.EntityMagmaCube;
+import net.minecraft.server.EntitySlime;
 import net.minecraft.server.World;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
@@ -17,6 +18,12 @@ import org.bukkit.entity.Player;
 public class StatsEntityMagmaCube extends EntityMagmaCube implements StatsEntity {
     private int level;
     private int maxHealth;
+    
+    private StatsEntityMagmaCube(World world, int level) {
+        super(world);
+        this.level = level;
+        maxHealth = MobStats.getPlugin().health(level, super.getMaxHealth());
+    }
     
     public StatsEntityMagmaCube(World world) {
         super(world);
@@ -41,16 +48,17 @@ public class StatsEntityMagmaCube extends EntityMagmaCube implements StatsEntity
     }
     
     /**
-     * Taking from the super class but with the addition 
+     * Taking from the super class but with the addition of a damage edit.
+     * 
      * @param entityhuman 
      */
     @Override
-    public void b_(EntityHuman entityhuman) {
-        if (this.m()) {
-            int i = this.getSize();
+    public void c_(EntityHuman entityhuman) {
+        if (l()) {
+            int i = getSize();
 
-            if (this.l(entityhuman) && this.e(entityhuman) < 0.6D * (double) i * 0.6D * (double) i && entityhuman.damageEntity(DamageSource.mobAttack(this), MobStats.getPlugin().damage(level, this.n()))) {
-                this.world.makeSound(this, "mob.slimeattack", 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
+            if ((m(entityhuman)) && (e(entityhuman) < 0.6D * i * 0.6D * i) && (entityhuman.damageEntity(DamageSource.mobAttack(this), MobStats.getPlugin().damage(level, m())))) {
+                this.world.makeSound(this, "mob.attack", 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
             }
         }
     }
@@ -78,5 +86,10 @@ public class StatsEntityMagmaCube extends EntityMagmaCube implements StatsEntity
             }
             plugin.callKillMessages(player, (LivingEntity) getBukkitEntity(), level, cash, expToDrop);
         }
+    }
+    
+    @Override
+    protected EntitySlime i() {
+        return new StatsEntityMagmaCube(world, level);
     }
 }

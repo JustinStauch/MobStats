@@ -2,12 +2,10 @@ package mobstats.listeners;
 
 import mobstats.MobStats;
 import mobstats.entities.StatsEntity;
-import mobstats.entities.StatsEntityBlaze;
 import net.minecraft.server.World;
+import org.apache.commons.lang.WordUtils;
 import org.bukkit.Location;
-import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
-import org.bukkit.craftbukkit.entity.CraftBlaze;
 import org.bukkit.craftbukkit.entity.CraftEntity;
 
 import org.bukkit.entity.Entity;
@@ -15,7 +13,6 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -125,7 +122,11 @@ public class Players implements Listener{
         }
         if (plugin.isAffected(damager.getType())) {
             String message = plugin.getDeathMessage();
-            message = message.replaceAll("-mob", damager.getType().toString());
+            String entityName = damager.getType().toString();
+            entityName = entityName.toLowerCase();
+            entityName = entityName.replaceAll("_", " ");
+            entityName = WordUtils.capitalize(entityName);
+            message = message.replaceAll("-mob", entityName);
             message = message.replaceAll("-player", event.getEntity().getDisplayName());
             message = message.replaceAll("-level", String.valueOf(((StatsEntity) ((CraftEntity) damager).getHandle()).getLevel()));
             event.setDeathMessage(message);

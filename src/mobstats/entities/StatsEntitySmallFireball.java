@@ -43,6 +43,7 @@ public class StatsEntitySmallFireball extends EntitySmallFireball {
             if (movingobjectposition.entity != null) {
                 if (!(shooter instanceof StatsEntity)) {
                     super.a(movingobjectposition);
+                    return;
                 }
                 if (!movingobjectposition.entity.isFireproof() && movingobjectposition.entity.damageEntity(DamageSource.fireball(this, this.shooter), MobStats.getPlugin().damage(((StatsEntity) shooter).getLevel(), 5))) {
                     // CraftBukkit start - entity damage by entity event + combust event

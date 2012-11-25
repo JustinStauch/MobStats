@@ -41,7 +41,7 @@ public class StatsEntityOcelot extends EntityOcelot implements StatsEntity {
     }
     
     @Override
-    public boolean k(Entity entity) {
+    public boolean m(Entity entity) {
         return entity.damageEntity(DamageSource.mobAttack(this), MobStats.getPlugin().damage(level, 3));
     }
     

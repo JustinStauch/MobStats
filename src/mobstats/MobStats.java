@@ -1,6 +1,7 @@
 package mobstats;
 
 import arrowpro.arrow.ArrowType;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 import mobstats.entities.*;
 import mobstats.equations.StatSolver;
@@ -29,6 +31,9 @@ import mobstats.listeners.Players;
 import net.milkbowl.vault.economy.Economy;
 
 import net.minecraft.server.EntityTypes;
+import net.minecraft.server.Item;
+
+import org.apache.commons.lang.WordUtils;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -36,12 +41,14 @@ import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.craftbukkit.entity.CraftBat;
 import org.bukkit.craftbukkit.entity.CraftBlaze;
 import org.bukkit.craftbukkit.entity.CraftCaveSpider;
 import org.bukkit.craftbukkit.entity.CraftChicken;
 import org.bukkit.craftbukkit.entity.CraftCow;
 import org.bukkit.craftbukkit.entity.CraftCreeper;
 import org.bukkit.craftbukkit.entity.CraftEnderDragon;
+import org.bukkit.craftbukkit.entity.CraftEnderman;
 import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.craftbukkit.entity.CraftGhast;
 import org.bukkit.craftbukkit.entity.CraftIronGolem;
@@ -59,6 +66,8 @@ import org.bukkit.craftbukkit.entity.CraftSnowman;
 import org.bukkit.craftbukkit.entity.CraftSpider;
 import org.bukkit.craftbukkit.entity.CraftSquid;
 import org.bukkit.craftbukkit.entity.CraftVillager;
+import org.bukkit.craftbukkit.entity.CraftWitch;
+import org.bukkit.craftbukkit.entity.CraftWither;
 import org.bukkit.craftbukkit.entity.CraftWolf;
 import org.bukkit.craftbukkit.entity.CraftZombie;
 import org.bukkit.entity.EntityType;
@@ -94,6 +103,7 @@ public class MobStats extends JavaPlugin {
     private boolean useAffectedMobs;
     private PluginManager manager;
     private ArrayList<Drop> drops;
+    private ArrayList<MobEquipment> equipment;
     private boolean useMoney;
     private HashMap<String, Boolean> notifications;
     
@@ -164,11 +174,8 @@ public class MobStats extends JavaPlugin {
         health = getEquation("Equations.Health");
         xp = getEquation("Equations.XP");
         setupDrops();
+        setupEquipment();
         setupAffectedMobs();
-        
-        if (isArrowProLoaded()) {
-            StatsEntitySkeleton.arrow = ArrowType.fromName(config.getString("Skeleton Arrow"));
-        }
         
         manager.registerEvents(new Entities(this), this);
         manager.registerEvents(new Players(this), this);
@@ -300,7 +307,11 @@ public class MobStats extends JavaPlugin {
             return;
         }
         String messageTemp = getKillMessage();
-        messageTemp = messageTemp.replaceAll("-mob", entity.getType().toString());
+        String entityName = entity.getType().toString();
+        entityName = entityName.toLowerCase();
+        entityName = entityName.replaceAll("_", " ");
+        entityName = WordUtils.capitalize(entityName);
+        messageTemp = messageTemp.replaceAll("-mob", entityName);
         messageTemp = messageTemp.replaceAll("-level", String.valueOf(level));
         messageTemp = messageTemp.replaceAll("-money", String.valueOf(cash));
         messageTemp = messageTemp.replaceAll("-exp", String.valueOf(exp));
@@ -342,6 +353,12 @@ public class MobStats extends JavaPlugin {
                 }
                 good = new CraftBlaze((CraftServer) bad.getServer(), new StatsEntityBlaze(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 break;
+            case BAT:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityBat) {
+                    return bad;
+                }
+                good = new CraftBat((CraftServer) bad.getServer(), new StatsEntityBat(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
             case CAVE_SPIDER:
                 if (((CraftEntity) bad).getHandle() instanceof StatsEntityCaveSpider) {
                     return bad;
@@ -373,10 +390,10 @@ public class MobStats extends JavaPlugin {
                 good = new CraftEnderDragon((CraftServer) bad.getServer(), new StatsEntityEnderDragon(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 break;
             case ENDERMAN:
-                if (((CraftEntity) bad).getHandle() instanceof StatsEntityBlaze) {
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityEnderman) {
                     return bad;
                 }
-                good = new CraftBlaze((CraftServer) bad.getServer(), new StatsEntityBlaze(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                good = new CraftEnderman((CraftServer) bad.getServer(), new StatsEntityEnderman(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 break;
             case GHAST:
                 if (((CraftEntity) bad).getHandle() instanceof StatsEntityGhast) {
@@ -433,10 +450,18 @@ public class MobStats extends JavaPlugin {
                 good = new CraftSilverfish((CraftServer) bad.getServer(), new StatsEntitySilverfish(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 break;
             case SKELETON:
-                if (((CraftEntity) bad).getHandle() instanceof StatsEntitySkeleton) {
-                    return bad;
+                if (isArrowProLoaded()) {
+                    if (((CraftEntity) bad).getHandle() instanceof StatsEntityProSkeleton) {
+                        return bad;
+                    }
+                    good = new CraftSkeleton((CraftServer) bad.getServer(), new StatsEntityProSkeleton(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 }
-                good = new CraftSkeleton((CraftServer) bad.getServer(), new StatsEntitySkeleton(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                else {
+                    if (((CraftEntity) bad).getHandle() instanceof StatsEntitySkeleton) {
+                        return bad;
+                    }
+                    good = new CraftSkeleton((CraftServer) bad.getServer(), new StatsEntitySkeleton(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                }
                 break;
             case SLIME:
                 if (((CraftEntity) bad).getHandle() instanceof StatsEntitySlime) {
@@ -468,6 +493,18 @@ public class MobStats extends JavaPlugin {
                 }
                 good = new CraftVillager((CraftServer) bad.getServer(), new StatsEntityVillager(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
                 break;
+            case WITCH:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityWitch) {
+                    return bad;
+                }
+                good = new CraftWitch((CraftServer) bad.getServer(), new StatsEntityWitch(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
+            case WITHER:
+                if (((CraftEntity) bad).getHandle() instanceof StatsEntityWither) {
+                    return bad;
+                }
+                good = new CraftWither((CraftServer) bad.getServer(), new StatsEntityWither(((CraftWorld) bad.getWorld()).getHandle(), level, health(level, bad.getMaxHealth())));
+                break;
             case WOLF:
                 if (((CraftEntity) bad).getHandle() instanceof StatsEntityWolf) {
                     return bad;
@@ -484,6 +521,20 @@ public class MobStats extends JavaPlugin {
         good.getHandle().setPosition(loco.getX(), loco.getY(), loco.getZ());
         good.setHealth(good.getMaxHealth());
         net.minecraft.server.World worl = ((CraftWorld) world).getHandle();
+        for (MobEquipment equip : equipment) {
+            net.minecraft.server.ItemStack[] items = equip.getEquipment(good);
+            for (int x = 0; x < items.length; x++) {
+                if (items[x] != null) {
+                    good.getHandle().setEquipment(x, items[x]);
+                }
+            }
+            if (good.getHandle() instanceof StatsEntityProSkeleton && equip instanceof ProMobEquipment) {
+                ((StatsEntityProSkeleton) good.getHandle()).setArrow(((ProMobEquipment) equip).getArrow(good.getHandle()));
+            }
+            if (good.getType().equals(EntityType.SKELETON) && items[0] == null) {
+                good.getHandle().setEquipment(0, new net.minecraft.server.ItemStack(Item.BOW, 1));
+            }
+        }
         if (removeOtherEntity) {
             worl.removeEntity(((CraftEntity) bad).getHandle());
         }
@@ -850,7 +901,9 @@ public class MobStats extends JavaPlugin {
                     tempLoc = origins.get(worlds.get(x));
                     origins.remove(worlds.get(x));
                 }
-                else tempLoc = new ArrayList<Location>();
+                else {
+                    tempLoc = new ArrayList<Location>();
+                }
                 tempLoc.add(worlds.get(x).getSpawnLocation());
                 origins.put(worlds.get(x), tempLoc);
                 ArrayList<String> tempS = new ArrayList<String>();
@@ -903,7 +956,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -943,7 +996,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -962,7 +1015,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -983,7 +1036,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -1036,7 +1089,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -1057,7 +1110,7 @@ public class MobStats extends JavaPlugin {
             else {
                 max = Double.POSITIVE_INFINITY;
             }
-            if (getConfig().contains(path + "min")) {
+            if (getConfig().contains(path + ".min")) {
                 min = getConfig().getDouble(path + ".min");
             }
             else {
@@ -1096,7 +1149,86 @@ public class MobStats extends JavaPlugin {
         List<String> dropper = config.getStringList("Drops");
         for (String x : dropper) {
             if (!config.contains(x)) {
-                System.out.print("[" + info.getName() + "] Config does not conatain " + x);
+                getLogger().log(Level.CONFIG,"[" + info.getName() + "] Config does not conatain " + x);
+                continue;
+            }
+            List<String> mobs;
+            ArrayList<EntityType> usedMobs = new ArrayList<EntityType>();
+            if (config.contains(x + ".Mobs")) {
+                mobs = config.getStringList(x + ".Mobs");
+                for (String y : mobs) {
+                    usedMobs.add(EntityType.fromName(y));
+                }
+                if (usedMobs.isEmpty()) {
+                    usedMobs = getListOfAllTypes();
+                }
+            }
+            else {
+                usedMobs = getListOfAllTypes();
+            }
+            int startZone;
+            if (!config.contains(x + ".Start Zone")) {
+                startZone = Integer.MIN_VALUE;
+            }
+            else {
+                startZone = config.getInt(x + ".Start Zone");
+            }
+            int endZone;
+            if (!config.contains(x + ".End Zone")) {
+                endZone = Integer.MAX_VALUE;
+            }
+            else {
+                endZone = config.getInt(x + ".End Zone");
+            }
+            int numerator, denominator;
+            if (!config.contains(x + ".Odds")) {
+                numerator = 1;
+                denominator = 1;
+                config.set(x + ".Odds", 1);
+            }
+            else {
+                String odds = config.getString(x + ".Odds");
+                String[] odder = odds.split("/");
+                if (odder.length == 1) {
+                    numerator = 1;
+                    denominator = 1;
+                }
+                else {
+                    numerator = Integer.parseInt(odder[0]);
+                    denominator = Integer.parseInt(odder[1]);
+                }
+                config.set(x + ".Odds", odds);
+            }
+            if (!config.contains(x + ".Items")) {
+                getLogger().log(Level.CONFIG, "[" + info.getName() + "] " + x + " needs items.");
+                continue;
+            }
+            List<String> items = config.getStringList(x + ".Items");
+            ArrayList<ItemStack> allItems = new ArrayList<ItemStack>();
+            for (String item : items) {
+                String[] parts = item.split(",");
+                int id = Integer.parseInt(parts[0]);
+                int amt;
+                if (parts.length == 1) amt = 1;
+                else amt = Integer.parseInt(parts[1]);
+                allItems.add(new ItemStack(id, amt));
+            }
+            drops.add(new Drop(allItems, startZone, endZone, numerator, denominator, usedMobs, this));
+        }
+    }
+    
+    /**
+     * Reads the equipment configuration from the config file.
+     */
+    private void setupEquipment() {
+        equipment = new ArrayList<MobEquipment>();
+        if (!config.contains("Equipment")) {
+            return;
+        }
+        List<String> equip = config.getStringList("Equipment");
+        for (String x : equip) {
+            if (!config.contains(x)) {
+                getLogger().log(Level.CONFIG, "[" + info.getName() + "] Config does not contain " + x + ".");
                 continue;
             }
             List<String> mobs;
@@ -1108,11 +1240,10 @@ public class MobStats extends JavaPlugin {
             }
             else usedMobs = getListOfAllTypes();
             int startZone;
-            if (!config.contains(x + ".Start Zone")) startZone = 0;
+            if (!config.contains(x + ".Start Zone")) startZone = Integer.MIN_VALUE;
             else startZone = config.getInt(x + ".Start Zone");
-            config.set(x + ".Start Zone", startZone);
             int endZone;
-            if (!config.contains(x + ".End Zone")) endZone = -1;
+            if (!config.contains(x + ".End Zone")) endZone = Integer.MAX_VALUE;
             else endZone = config.getInt(x + ".End Zone");
             config.set(x + ".End Zone", endZone);
             int numerator, denominator;
@@ -1135,21 +1266,56 @@ public class MobStats extends JavaPlugin {
                 config.set(x + ".Odds", odds);
             }
             if (!config.contains(x + ".Items")) {
-                System.out.println("[" + info.getName() + "] " + x + " needs items");
+                getLogger().log(Level.CONFIG, "[{0}] {1} needs items.", new Object[]{info.getName(), x});
                 continue;
             }
             List<String> items = config.getStringList(x + ".Items");
-            ArrayList<ItemStack> allItems = new ArrayList<ItemStack>();
-            config.set(x + ".Items", items);
-            for (String item : items) {
-                String[] parts = item.split(",");
-                int id = Integer.parseInt(parts[0]);
+            net.minecraft.server.ItemStack[] allItems = new net.minecraft.server.ItemStack[5];
+            Object arrow = null;
+            for (int y = 0; y < items.size(); y++) {
+                String[] parts = items.get(y).split(", ");
+                Item ite;
+                int id;
+                if (isArrowProLoaded()) {
+                    if (ArrowType.isAnArrow(parts[0])) {
+                        id = Item.BOW.id;
+                        arrow = ArrowType.fromAbbreviation(parts[0]);
+                    }
+                    else {
+                        id = Integer.parseInt(parts[0]);
+                    }
+                }
+                else {
+                    id = Integer.parseInt(parts[0]);
+                }
                 int amt;
-                if (parts.length == 1) amt = 1;
-                else amt = Integer.parseInt(parts[1]);
-                allItems.add(new ItemStack(id, amt));
+                if (parts.length == 1) {
+                    amt = 1;
+                }
+                else {
+                    amt = Integer.parseInt(parts[1]);
+                }
+                ite = Item.byId[id];
+                int place;
+                if (parts.length > 2) {
+                    place = Integer.parseInt(parts[2]);
+                }
+                else {
+                    place = y;
+                }
+                allItems[place] = new net.minecraft.server.ItemStack(ite, amt);
             }
-            drops.add(new Drop(allItems, startZone, endZone, numerator, denominator, usedMobs, this));
+            if (arrow != null && isArrowProLoaded()) {
+                if (arrow instanceof ArrowType) {
+                    equipment.add(new ProMobEquipment(allItems, startZone, endZone, numerator, denominator, usedMobs, (ArrowType) arrow));
+                }
+                else {
+                    equipment.add(new MobEquipment(allItems, startZone, endZone, numerator, denominator, usedMobs));
+                }
+            }
+            else {
+                equipment.add(new MobEquipment(allItems, startZone, endZone, numerator, denominator, usedMobs));
+            }
         }
     }
     
@@ -1158,7 +1324,7 @@ public class MobStats extends JavaPlugin {
      */
     private void setupCash() {
         if (!setupEconomy()) {
-            System.out.println("[" + info.getName() + "] No economy found! Ignoring economy.");
+            getLogger().log(Level.CONFIG, "[" + info.getName() + "] No economy found! Ignoring economy.");
             useMoney = false;
             return;
         }
@@ -1218,6 +1384,8 @@ public class MobStats extends JavaPlugin {
         switch (ent) {
             case BLAZE:
                 return StatsEntityBlaze.class;
+            case BAT:
+                return StatsEntityBat.class;
             case CAVE_SPIDER:
                 return StatsEntityCaveSpider.class;
             case CHICKEN:
@@ -1251,7 +1419,7 @@ public class MobStats extends JavaPlugin {
             case SILVERFISH:
                 return StatsEntitySilverfish.class;
             case SKELETON:
-                return StatsEntitySkeleton.class;
+                return isArrowProLoaded() ? StatsEntityProSkeleton.class : StatsEntitySkeleton.class;
             case SLIME:
                 return StatsEntitySlime.class;
             case SNOWMAN:
@@ -1262,6 +1430,10 @@ public class MobStats extends JavaPlugin {
                 return StatsEntitySquid.class;
             case VILLAGER:
                 return StatsEntityVillager.class;
+            case WITCH:
+                return StatsEntityWitch.class;
+            case WITHER:
+                return StatsEntityWither.class;
             case WOLF:
                 return StatsEntityWolf.class;
             case ZOMBIE:

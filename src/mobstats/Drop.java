@@ -1,13 +1,13 @@
 package mobstats;
 
 import java.util.ArrayList;
-
 import java.util.Random;
+
 import mobstats.entities.StatsEntity;
+
 import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
 
 /**
@@ -57,7 +57,7 @@ public class Drop {
             throw new IllegalArgumentException("The entity wasn't changed to a proper entity.");
         }
         int level = ((StatsEntity) ((CraftEntity) entity).getHandle()).getLevel();
-        if (level >= startZone && (level <= endZone || endZone == -1)) {
+        if (level >= startZone && level <= endZone) {
             if (!mobs.isEmpty() && !mobs.contains(entity.getType())) {
                 return;
             }

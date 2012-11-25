@@ -36,10 +36,14 @@ public class Entities implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
+        boolean egg = false;
+        if (event.getSpawnReason().equals(SpawnReason.EGG)) {
+            egg = true;
+        }
         if (event.isCancelled()) {
             return;
         }
-        if (((CraftEntity) event.getEntity()).getHandle() instanceof StatsEntity) {
+        if ((((CraftEntity) event.getEntity()).getHandle() instanceof StatsEntity) && !egg) {
             return;
         }
         plugin.replaceEntity(event.getEntity(), event.getSpawnReason(), false);
@@ -72,6 +76,35 @@ public class Entities implements Listener {
             loco.getBlock().setType(Material.AIR);
             loco.setY(loco.getY() + 1);
             loco.getBlock().setType(Material.AIR);
+        }
+        if (event.getSpawnReason().equals(SpawnReason.BUILD_WITHER)) {
+            Location loco = event.getLocation();
+            loco.getBlock().setType(Material.AIR);
+            loco.setY(loco.getY() + 1);
+            loco.getBlock().setType(Material.AIR);
+            loco.setY(loco.getY() + 1);
+            loco.getBlock().setType(Material.AIR);
+            loco.setY(loco.getY() - 1);
+            Location side1 = new Location(loco.getWorld(), loco.getX() + 1, loco.getY(), loco.getZ());
+            Location side2 = new Location(loco.getWorld(), loco.getX() - 1, loco.getY(), loco.getZ());
+            if (side1.getBlock().getTypeId() == Material.SOUL_SAND.getId() && side2.getBlock().getTypeId() == Material.SOUL_SAND.getId()) {
+                side1.getBlock().setType(Material.AIR);
+                side2.getBlock().setType(Material.AIR);
+                side1.setY(side1.getY() + 1);
+                side2.setY(side2.getY() + 1);
+                side1.getBlock().setType(Material.AIR);
+                side2.getBlock().setType(Material.AIR);
+            }
+            else {
+                side1 = new Location(loco.getWorld(), loco.getX(), loco.getY(), loco.getZ() + 1);
+                side2 = new Location(loco.getWorld(), loco.getX(), loco.getY(), loco.getZ() - 1);
+                side1.getBlock().setType(Material.AIR);
+                side2.getBlock().setType(Material.AIR);
+                side1.setY(side1.getY() + 1);
+                side2.setY(side2.getY() + 1);
+                side1.getBlock().setType(Material.AIR);
+                side2.getBlock().setType(Material.AIR);
+            }
         }
     }
     

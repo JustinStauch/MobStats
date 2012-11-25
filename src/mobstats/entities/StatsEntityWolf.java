@@ -41,9 +41,8 @@ public class StatsEntityWolf extends EntityWolf implements StatsEntity {
     }
     
     @Override
-    public boolean k(Entity entity) {
-        int i = MobStats.getPlugin().damage(level, isTamed() ? 4 : 2);
-        return entity.damageEntity(DamageSource.mobAttack(this), i);
+    public boolean m(Entity entity) {
+        return entity.damageEntity(DamageSource.mobAttack(this), MobStats.getPlugin().damage(level, 3));
     }
     
     @Override

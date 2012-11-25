@@ -1,5 +1,7 @@
 package mobstats.entities;
 
+import java.lang.reflect.Field;
+import java.util.logging.Level;
 import mobstats.MobStats;
 import net.minecraft.server.DamageSource;
 import net.minecraft.server.Entity;
@@ -40,19 +42,26 @@ public class StatsEntityIronGolem extends EntityIronGolem implements StatsEntity
         return level;
     }
     
-    /**
-     * The same method as the overriden one with the change of f not being assigned to anything and the edit of the damage using the equation.
-     * 
-     * @param entity
-     * @return 
-     */
     @Override
-    public boolean k(Entity entity) {
+    public boolean m(Entity entity) {
+        
+        try {
+            Field f = EntityIronGolem.class.getDeclaredField("f");
+            f.setAccessible(true);
+            EntityIronGolem gol = this;
+            f.setInt(gol, 10);
+        } catch (NoSuchFieldException ex) {
+            MobStats.getPlugin().getLogger().log(Level.SEVERE, null, ex);
+        } catch (SecurityException ex) {
+            MobStats.getPlugin().getLogger().log(Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            MobStats.getPlugin().getLogger().log(Level.SEVERE, null, ex);
+        }
         this.world.broadcastEntityEffect(this, (byte) 4);
         boolean flag = entity.damageEntity(DamageSource.mobAttack(this), MobStats.getPlugin().damage(level, 7 + this.random.nextInt(15)));
 
         if (flag) {
-            entity.motY += 0.4000000059604645D;
+          entity.motY += 0.4000000059604645D;
         }
 
         this.world.makeSound(this, "mob.irongolem.throw", 1.0F, 1.0F);
